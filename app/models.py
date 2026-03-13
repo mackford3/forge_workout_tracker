@@ -207,3 +207,57 @@ class CircuitRoundSet(db.Model):
     steps               = db.Column(db.Integer)
     skipped             = db.Column(db.Boolean, default=False)
     notes               = db.Column(db.Text)
+
+
+# ── Structured Program ──────────────────────────────────────
+
+class Program(db.Model):
+    __tablename__ = 'programs'
+    id          = db.Column(db.Integer, primary_key=True)
+    name        = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text)
+    total_weeks = db.Column(db.Integer, nullable=False)
+    is_active   = db.Column(db.Boolean, default=False)
+    start_date  = db.Column(db.Date)
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    phases      = db.relationship('ProgramPhase', backref='program', lazy='dynamic',
+                                  order_by='ProgramPhase.phase_number', cascade='all, delete-orphan')
+    days        = db.relationship('ProgramDay',   backref='program', lazy='dynamic',
+                                  cascade='all, delete-orphan')
+
+
+class ProgramPhase(db.Model):
+    __tablename__ = 'program_phases'
+    id           = db.Column(db.Integer, primary_key=True)
+    program_id   = db.Column(db.Integer, db.ForeignKey('programs.id'), nullable=False)
+    phase_number = db.Column(db.Integer, nullable=False)
+    name         = db.Column(db.String(150))
+    focus        = db.Column(db.Text)
+    week_start   = db.Column(db.Integer, nullable=False)
+    week_end     = db.Column(db.Integer, nullable=False)
+
+
+class ProgramDay(db.Model):
+    __tablename__ = 'program_days'
+    id          = db.Column(db.Integer, primary_key=True)
+    program_id  = db.Column(db.Integer, db.ForeignKey('programs.id'), nullable=False)
+    phase_id    = db.Column(db.Integer, db.ForeignKey('program_phases.id'))
+    week_number = db.Column(db.Integer, nullable=False)
+    day_of_week = db.Column(db.String(10), nullable=False)
+    day_number  = db.Column(db.Integer, nullable=False)
+    name        = db.Column(db.String(150))
+    exercises   = db.Column(db.Text)   # JSON array string
+    notes       = db.Column(db.Text)
+    completions = db.relationship('ProgramCompletion', backref='day', lazy='dynamic',
+                                  cascade='all, delete-orphan')
+
+
+class ProgramCompletion(db.Model):
+    __tablename__ = 'program_completions'
+    id         = db.Column(db.Integer, primary_key=True)
+    day_id     = db.Column(db.Integer, db.ForeignKey('program_days.id'), nullable=False)
+    workout_id = db.Column(db.Integer, db.ForeignKey('workouts.id'), nullable=True)
+    completed  = db.Column(db.Boolean, default=False)
+    done_date  = db.Column(db.Date)
+    notes      = db.Column(db.Text)
+    workout    = db.relationship('Workout')

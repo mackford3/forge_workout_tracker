@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Program{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>PROGRAM</h1>
+  <p>6-Month Hyrox Prep</p>
+</div>
+
+{% if active %}
+{% set cw = current_week %}
+<div class="card" style="margin-bottom:12px;border-color:var(--accent);">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <span class="badge" style="background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);">● ACTIVE</span>
+    <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);">Week {{ current_week }} of {{ active.total_weeks }}</span>
+  </div>
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1;margin-bottom:4px;">{{ active.name }}</div>
+
+  <!-- Progress bar -->
+  <div style="height:4px;background:var(--surface2);border-radius:2px;margin:10px 0;">
+    <div style="height:4px;border-radius:2px;background:var(--accent);width:{{ ((current_week-1)/active.total_weeks*100)|int }}%;"></div>
+  </div>
+
+  {% if today_day %}
+  <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Today · {{ today_day.day_of_week }}</div>
+    <div style="font-weight:600;font-size:15px;">{{ today_day.name }}</div>
+  </div>
+  {% endif %}
+
+  <div style="display:flex;gap:8px;margin-top:12px;">
+    <a href="{{ url_for('program.week', program_id=active.id, week_num=current_week) }}" class="btn btn-primary btn-sm" style="flex:1;text-align:center;">This Week</a>
+    <a href="{{ url_for('program.view', program_id=active.id) }}" class="btn btn-secondary btn-sm" style="flex:1;text-align:center;">Full Schedule</a>
+  </div>
+</div>
+{% endif %}
+
+{% for p in programs %}
+{% if not p.is_active %}
+<div class="card" style="margin-bottom:10px;">
+  <div style="font-weight:700;font-size:16px;margin-bottom:4px;">{{ p.name }}</div>
+  <div style="font-size:12px;color:var(--muted);">{{ p.total_weeks }} weeks · Started {{ p.start_date.strftime('%b %d, %Y') if p.start_date else 'not started' }}</div>
+  <div style="margin-top:10px;display:flex;gap:8px;">
+    <a href="{{ url_for('program.view', program_id=p.id) }}" class="btn btn-secondary btn-sm">View</a>
+    <form method="post" action="{{ url_for('program.activate', program_id=p.id) }}" style="display:inline;">
+      <button class="btn btn-primary btn-sm">Set Active</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% endblock %}

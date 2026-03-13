@@ -7,6 +7,20 @@
   <p>Your year at a glance</p>
 </div>
 
+{% if today_program_day and 'Rest' not in today_program_day.name %}
+<!-- Today's Workout -->
+<a href="{{ url_for('program.week', program_id=today_program.id, week_num=today_program_day._week) }}" style="text-decoration:none;color:inherit;display:block;margin-bottom:10px;">
+<div class="card" style="border-color:var(--accent);cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+    <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);">Today's Workout · Week {{ today_program_day._week }}</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)"><polyline points="9 18 15 12 9 6"/></svg>
+  </div>
+  <div style="font-weight:700;font-size:17px;">{{ today_program_day.name }}</div>
+  <div style="font-size:11px;color:var(--muted);margin-top:3px;">{{ today_program.name }}</div>
+</div>
+</a>
+{% endif %}
+
 <!-- YTD Stats -->
 <div class="stat-grid four" style="margin-bottom:10px;text-align:center;">
   <div class="stat-box">

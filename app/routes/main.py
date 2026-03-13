@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, session, redirect, request, url_for, current_app
 from sqlalchemy import func, extract
 from datetime import datetime, timedelta, date
-from ..models import db, Workout, WorkoutSet, Run, WorkoutPlan, HyroxResult
+from ..models import db, Workout, WorkoutSet, Run, WorkoutPlan, HyroxResult, Program, ProgramDay
 from sqlalchemy import extract as db_extract
 
 main_bp = Blueprint('main', __name__)
@@ -93,6 +93,22 @@ def index():
         extract('year', Workout.completed_at) == year
     ).group_by(Workout.location).all()
 
+    # Today's workout from active program
+    today_program_day = None
+    today_program     = Program.query.filter_by(is_active=True).first()
+    if today_program:
+        from datetime import date
+        delta     = (date.today() - today_program.start_date).days
+        week_num  = min((delta // 7) + 1, today_program.total_weeks)
+        day_num   = (delta % 7) + 1
+        today_program_day = ProgramDay.query.filter_by(
+            program_id=today_program.id,
+            week_number=week_num,
+            day_number=day_num
+        ).first()
+        if today_program_day:
+            today_program_day._week = week_num
+
     return render_template('index.html',
         ytd_workouts=ytd_workouts,
         ytd_weight=float(ytd_weight),
@@ -107,8 +123,9 @@ def index():
         year=year,
         current_streak=current_streak,
         longest_streak=longest_streak,
+        today_program=today_program,
+        today_program_day=today_program_day,
     )
-
 
 @main_bp.route('/set-unit/<unit>')
 def set_unit(unit):
@@ -200,6 +217,22 @@ def calendar(year=None, month=None):
     else:
         month_distance = 0
 
+    # Today's workout from active program
+    today_program_day = None
+    today_program     = Program.query.filter_by(is_active=True).first()
+    if today_program:
+        from datetime import date
+        delta     = (date.today() - today_program.start_date).days
+        week_num  = min((delta // 7) + 1, today_program.total_weeks)
+        day_num   = (delta % 7) + 1
+        today_program_day = ProgramDay.query.filter_by(
+            program_id=today_program.id,
+            week_number=week_num,
+            day_number=day_num
+        ).first()
+        if today_program_day:
+            today_program_day._week = week_num
+
     return render_template('calendar.html',
         year=year, month=month, month_name=month_name,
         cal_weeks=cal_weeks, day_map=day_map,
@@ -209,4 +242,6 @@ def calendar(year=None, month=None):
         month_weight=month_weight,
         month_distance=month_distance,
         month_prs=month_prs,
+        today_program=today_program,
+        today_program_day=today_program_day,
     )

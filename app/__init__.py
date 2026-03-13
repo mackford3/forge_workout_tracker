@@ -46,12 +46,14 @@ def create_app():
     from .routes.workouts  import workouts_bp
     from .routes.progress  import progress_bp
     from .routes.plans import plans_bp
+    from .routes.program import program_bp
     from .routes.exercises import exercises_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(workouts_bp,  url_prefix='/workouts')
     app.register_blueprint(progress_bp,  url_prefix='/progress')
     app.register_blueprint(plans_bp, url_prefix='/plans')
+    app.register_blueprint(program_bp, url_prefix='/program')
     app.register_blueprint(exercises_bp, url_prefix='/exercises')
 
     @app.context_processor
