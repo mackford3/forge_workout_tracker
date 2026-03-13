@@ -5,7 +5,7 @@ from sqlalchemy import func
 progress_bp = Blueprint('progress', __name__)
 
 
-@progress_bp.route('/')
+@progress_bp.route('')
 def index():
     exercises = Exercise.query.filter(
         Exercise.category == 'strength'
@@ -62,13 +62,90 @@ def data():
     result = []
     for date_key in sorted(by_date.keys()):
         e = by_date[date_key]
+        # Volume = sum(weight_lbs * reps) for all sets this session
+        volume_lbs = sum(
+            s['lbs'] * s['reps'] for s in e['sets']
+            if s['lbs'] and s['reps']
+        )
+        # Best estimated 1RM (Epley) across all sets this session
+        best_1rm = 0
+        for s in e['sets']:
+            if s['lbs'] and s['reps']:
+                r = s['reps']
+                est = s['lbs'] if r == 1 else s['lbs'] * (1 + r / 30)
+                if est > best_1rm:
+                    best_1rm = est
         result.append({
             'date':         date_key,
             'max_lbs':      e['max_lbs'],
             'max_kg':       e['max_kg'],
+            'volume_lbs':   round(volume_lbs, 1),
+            'volume_kg':    round(volume_lbs / 2.20462, 1),
+            'est_1rm_lbs':  round(best_1rm, 1),
+            'est_1rm_kg':   round(best_1rm / 2.20462, 1),
             'sets':         e['sets'],
             'workout_name': e['workout_name'],
             'workout_id':   e['workout_id'],
+        })
+
+    return jsonify(result)
+
+
+@progress_bp.route('/run-data')
+def run_data():
+    from ..models import Run, RunSegment
+    from flask import jsonify
+
+    # Get all runs with their segments
+    runs = (
+        db.session.query(Run)
+        .join(Workout, Workout.id == Run.workout_id)
+        .order_by(Workout.completed_at.asc())
+        .all()
+    )
+
+    result = []
+    for run in runs:
+        workout = run.workout
+
+        # Distance: use stored total, or sum active segments
+        dist_km = float(run.total_distance_km) if run.total_distance_km else None
+        if not dist_km:
+            seg_total = sum(
+                float(s.distance_km) for s in run.segments
+                if s.distance_km and not s.skipped
+            )
+            dist_km = seg_total if seg_total > 0 else None
+
+        if not dist_km:
+            continue  # skip runs with no distance at all
+
+        # Duration: use stored total, or sum active segments
+        dur_s = run.total_duration_s or None
+        if not dur_s:
+            seg_dur = sum(
+                s.duration_s for s in run.segments
+                if s.duration_s and not s.skipped
+            )
+            dur_s = seg_dur if seg_dur > 0 else None
+
+        # Pace per km
+        pace_s   = int(dur_s / dist_km) if dur_s and dist_km else None
+        pace_str = f"{pace_s//60}:{pace_s%60:02d}" if pace_s else None
+
+        # Interval count
+        interval_count = sum(1 for s in run.segments if s.segment_type == 'interval' and not s.skipped)
+
+        result.append({
+            'date':           workout.completed_at.strftime('%Y-%m-%d'),
+            'distance_km':    round(dist_km, 3),
+            'duration_s':     dur_s,
+            'pace_s':         pace_s,
+            'pace_str':       pace_str,
+            'run_type':       run.run_type,
+            'interval_count': interval_count,
+            'workout_id':     workout.id,
+            'workout_name':   workout.name,
         })
 
     return jsonify(result)

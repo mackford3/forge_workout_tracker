@@ -1,5 +1,6 @@
 from sqlalchemy import func
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, Response
+import csv, io
 from datetime import datetime
 from ..models import (db, Workout, WorkoutSet, Exercise, Run, RunSegment,
                       CardioSet, HyroxResult, HyroxStation, HYROX_DEFAULT_STATIONS,
@@ -339,6 +340,72 @@ def htmx_circuit_exercise_row():
     exercises = Exercise.query.order_by(Exercise.name).all()
     return render_template('partials/circuit_exercise_row.html', index=index, exercises=exercises)
 
+
+
+
+# ── CSV Export ─────────────────────────────────────────────
+@workouts_bp.route('/export/csv')
+def export_csv():
+    workouts = Workout.query.order_by(Workout.completed_at.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # ── Workouts sheet ──────────────────────────────────────
+    writer.writerow(['=== WORKOUTS ==='])
+    writer.writerow(['id','date','name','type','location','duration_min','calories','avg_bpm','notes'])
+    for w in workouts:
+        writer.writerow([
+            w.id,
+            w.completed_at.strftime('%Y-%m-%d %H:%M'),
+            w.name, w.workout_type, w.location or '',
+            w.duration_minutes or '', w.calories or '',
+            w.avg_bpm or '', w.notes or '',
+        ])
+
+    writer.writerow([])
+
+    # ── Strength sets ───────────────────────────────────────
+    writer.writerow(['=== STRENGTH SETS ==='])
+    writer.writerow(['workout_id','date','workout_name','exercise','set_num','weight_lbs','weight_kg','reps','rpe','notes'])
+    sets = (db.session.query(WorkoutSet)
+            .join(Workout).order_by(Workout.completed_at.desc(), WorkoutSet.set_number).all())
+    for s in sets:
+        writer.writerow([
+            s.workout_id,
+            s.workout.completed_at.strftime('%Y-%m-%d'),
+            s.workout.name,
+            s.exercise.name,
+            s.set_number,
+            float(s.weight_lbs) if s.weight_lbs else '',
+            float(s.weight_kg)  if s.weight_kg  else '',
+            s.reps or '', float(s.rpe) if s.rpe else '',
+            s.notes or '',
+        ])
+
+    writer.writerow([])
+
+    # ── Runs ────────────────────────────────────────────────
+    writer.writerow(['=== RUNS ==='])
+    writer.writerow(['workout_id','date','workout_name','type','distance_km','duration_s','avg_hr'])
+    runs = (db.session.query(Run).join(Workout)
+            .order_by(Workout.completed_at.desc()).all())
+    for r in runs:
+        writer.writerow([
+            r.workout_id,
+            r.workout.completed_at.strftime('%Y-%m-%d'),
+            r.workout.name, r.run_type,
+            float(r.total_distance_km) if r.total_distance_km else '',
+            r.total_duration_s or '',
+            r.avg_heart_rate or '',
+        ])
+
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=forge_export.csv'}
+    )
 
 # ── Helpers ────────────────────────────────────────────────
 def _time_to_seconds(t):

@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+{% block title %}Calendar — {{ month_name }} {{ year }}{% endblock %}
+
+{% block content %}
+
+<!-- Nav row -->
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+  <a href="{{ url_for('main.index') }}" class="btn btn-secondary btn-sm">← Home</a>
+  <h1 style="font-size:28px;margin:0;flex:1;text-align:center;">{{ month_name|upper }} {{ year }}</h1>
+  <div style="display:flex;gap:6px;">
+    <a href="{{ url_for('main.calendar', year=prev_year, month=prev_month) }}" class="btn btn-secondary btn-sm">‹</a>
+    <a href="{{ url_for('main.calendar', year=next_year, month=next_month) }}" class="btn btn-secondary btn-sm">›</a>
+  </div>
+</div>
+
+<!-- ── Month Summary (TOP) ── -->
+<div class="card" style="margin-bottom:14px;">
+  <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">
+    {{ month_name }} {{ year }} Summary
+  </div>
+
+  <!-- Row 1: sessions + active days -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:30px;line-height:1;color:var(--accent);">
+        {{ day_map.values() | map('length') | sum }}
+      </div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-top:3px;">Sessions</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:30px;line-height:1;color:var(--text);">
+        {{ day_map | length }}
+      </div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-top:3px;">Active Days</div>
+    </div>
+  </div>
+
+  <!-- Row 2: PRs + distance + weight -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1;color:#ff4d00;">
+        {{ month_prs }}
+      </div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-top:3px;">PRs</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1;color:var(--run);">
+        {{ "%.1f"|format(month_distance) }}
+      </div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-top:3px;">km Run</div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1;color:var(--strength);">
+        {{ "{:,.0f}".format(month_weight) }}
+      </div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-top:3px;">lbs Lifted</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Legend ── -->
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+  {% for type, color in [('strength','#e8ff00'),('run','#00e5ff'),('hyrox','#ff4d00'),('circuit','#b44dff'),('amrap','#ff006e')] %}
+  <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);">
+    <div style="width:10px;height:10px;border-radius:2px;background:{{ color }};opacity:0.8;"></div>
+    {{ type }}
+  </div>
+  {% endfor %}
+  <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);">
+    <div style="width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);"></div>
+    today
+  </div>
+</div>
+
+<!-- ── Day-of-week headers ── -->
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px;">
+  {% for d in ['M','T','W','T','F','S','S'] %}
+  <div style="text-align:center;font-size:10px;font-weight:600;letter-spacing:0.08em;color:var(--muted);padding:4px 0;">{{ d }}</div>
+  {% endfor %}
+</div>
+
+<!-- ── Calendar grid ── -->
+<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:20px;">
+{% for week in cal_weeks %}
+  {% for day in week %}
+  {% if day == 0 %}
+  <div style="aspect-ratio:1;"></div>
+  {% else %}
+  {% set workouts_today = day_map.get(day, []) %}
+  {% set is_today = (today.year == year and today.month == month and today.day == day) %}
+  {% set has_workouts = workouts_today|length > 0 %}
+  {% set type_colors = {'strength':'#e8ff00','run':'#00e5ff','hyrox':'#ff4d00','circuit':'#b44dff','amrap':'#ff006e'} %}
+  {% set types = workouts_today | map(attribute='workout_type') | list %}
+
+  <div style="
+    aspect-ratio:1;
+    border-radius:8px;
+    border:{{ '2px solid var(--accent)' if is_today else '1px solid var(--border)' }};
+    background:{{ 'var(--surface)' if has_workouts else 'var(--bg)' }};
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;position:relative;
+    cursor:{{ 'pointer' if has_workouts else 'default' }};
+    transition:border-color 0.15s;
+    {% if has_workouts %}overflow:hidden;{% endif %}
+  "
+  {% if has_workouts %}
+    onclick="showDay({{ day }}, {{ workouts_today | map(attribute='id') | list }}, {{ workouts_today | map(attribute='name') | list | tojson }}, {{ types | tojson }})"
+  {% endif %}>
+
+    <!-- Color bar(s) at bottom -->
+    {% if has_workouts %}
+    <div style="position:absolute;bottom:0;left:0;right:0;height:4px;display:flex;gap:1px;">
+      {% for w in workouts_today %}
+      <div style="flex:1;background:{{ type_colors.get(w.workout_type, '#666') }};opacity:0.9;"></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="font-family:'DM Mono',monospace;font-size:13px;font-weight:{{ '700' if has_workouts else '400' }};color:{{ 'var(--text)' if has_workouts else 'var(--muted)' }};line-height:1;">{{ day }}</div>
+
+    {% if workouts_today|length > 1 %}
+    <div style="display:flex;gap:2px;margin-top:1px;">
+      {% for w in workouts_today %}
+      <div style="width:4px;height:4px;border-radius:50%;background:{{ type_colors.get(w.workout_type,'#666') }};"></div>
+      {% endfor %}
+    </div>
+    {% elif has_workouts %}
+    <div style="width:5px;height:5px;border-radius:50%;background:{{ type_colors.get(workouts_today[0].workout_type,'#666') }};margin-top:1px;"></div>
+    {% endif %}
+
+  </div>
+  {% endif %}
+  {% endfor %}
+{% endfor %}
+</div>
+
+<!-- ── Workout list for month ── -->
+{% if day_map %}
+<div>
+  {% for day in day_map.keys() | sort | reverse %}
+  {% for w in day_map[day] %}
+  <a href="{{ url_for('workouts.view', workout_id=w.id) }}" class="workout-row">
+    <div style="min-width:28px;text-align:center;">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1;color:var(--muted);">{{ day }}</span>
+    </div>
+    <div style="width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;background:{{ {'strength':'#e8ff00','run':'#00e5ff','hyrox':'#ff4d00','circuit':'#b44dff','amrap':'#ff006e'}.get(w.workout_type,'#666') }};"></div>
+    <div class="wr-info">
+      <div class="wr-name">{{ w.name }}</div>
+      <div class="wr-meta">
+        <span class="badge badge-{{ w.workout_type }}" style="font-size:9px;padding:1px 5px;">{{ w.workout_type }}</span>
+        {% if w.duration_minutes %} · {{ w.duration_minutes }}min{% endif %}
+        {% if w.calories %} · {{ w.calories }}cal{% endif %}
+      </div>
+    </div>
+    <div class="wr-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></div>
+  </a>
+  {% endfor %}
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:32px;color:var(--muted);">
+  No workouts logged in {{ month_name }}.
+</div>
+{% endif %}
+
+<!-- Day detail modal -->
+<div id="day-modal" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;width:90%;max-width:380px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div id="modal-date" style="font-family:'Bebas Neue',sans-serif;font-size:22px;"></div>
+      <button onclick="document.getElementById('day-modal').style.display='none'"
+        style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <div id="modal-workouts"></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TYPE_COLORS = {strength:'#e8ff00',run:'#00e5ff',hyrox:'#ff4d00',circuit:'#b44dff',amrap:'#ff006e'};
+
+function showDay(day, ids, names, types) {
+  if (ids.length === 1) { window.location = `/workouts/${ids[0]}`; return; }
+  document.getElementById('modal-date').textContent = `{{ month_name }} ${day}, {{ year }}`;
+  document.getElementById('modal-workouts').innerHTML = ids.map((id, i) => `
+    <a href="/workouts/${id}" style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;text-decoration:none;color:var(--text);">
+      <div style="width:4px;height:36px;border-radius:2px;background:${TYPE_COLORS[types[i]]||'#666'};flex-shrink:0;"></div>
+      <div>
+        <div style="font-weight:600;font-size:14px;">${names[i]}</div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;">${types[i]}</div>
+      </div>
+      <svg style="margin-left:auto;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>`).join('');
+  document.getElementById('day-modal').style.display = 'flex';
+}
+</script>
+{% endblock %}

@@ -166,6 +166,39 @@
           </tbody>
         </table>
       </div>
+      {# ── 1RM estimate (Epley: w × (1 + reps/30)) — only for weighted sets #}
+      {% set orm = namespace(best=0, best_w=0, best_r=0) %}
+      {% for s in ex_sets %}
+        {% if s.weight_lbs and s.reps and not s.skipped %}
+          {% set w = s.weight_lbs|float %}
+          {% set r = s.reps|int %}
+          {% if r == 1 %}
+            {% set est = w %}
+          {% else %}
+            {% set est = w * (1 + r / 30) %}
+          {% endif %}
+          {% if est > orm.best %}
+            {% set orm.best = est %}
+            {% set orm.best_w = w %}
+            {% set orm.best_r = r %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+      {% if orm.best > 0 %}
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">Est. 1RM</div>
+        <div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--accent);">
+          {% if weight_unit == 'lbs' %}
+            {{ orm.best|int }} lbs
+          {% else %}
+            {{ (orm.best / 2.20462)|round(1) }} kg
+          {% endif %}
+        </div>
+        <div style="font-size:11px;color:var(--muted);">
+          from {{ orm.best_w|int }}{{ weight_unit }} × {{ orm.best_r }} · Epley formula
+        </div>
+      </div>
+      {% endif %}
       {% if ex_sets[0].notes %}<p style="font-size:12px;color:var(--muted);margin-top:8px;">{{ ex_sets[0].notes }}</p>{% endif %}
     </div>
     {% endfor %}

@@ -6,11 +6,21 @@ exercises_bp = Blueprint('exercises', __name__)
 
 @exercises_bp.route('/')
 def index():
+    muscle_filter = request.args.get('muscle', '')
     exercises = Exercise.query.order_by(Exercise.category, Exercise.name).all()
+
+    # All distinct muscle groups for filter pills
+    all_muscles = sorted(set(e.muscle_group for e in exercises if e.muscle_group))
+
+    if muscle_filter:
+        exercises = [e for e in exercises if e.muscle_group == muscle_filter]
+
     grouped = {}
     for ex in exercises:
-        grouped.setdefault(ex.category, []).append(ex)
-    return render_template('exercises/index.html', grouped=grouped)
+        grouped.setdefault(ex.category or 'other', []).append(ex)
+
+    return render_template('exercises/index.html', grouped=grouped,
+                           all_muscles=all_muscles, muscle_filter=muscle_filter)
 
 
 @exercises_bp.route('/new', methods=['GET', 'POST'])

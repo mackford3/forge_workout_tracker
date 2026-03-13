@@ -8,7 +8,7 @@
 </div>
 
 <!-- YTD Stats -->
-<div class="stat-grid four" style="margin-bottom:10px;">
+<div class="stat-grid four" style="margin-bottom:10px;text-align:center;">
   <div class="stat-box">
     <div class="stat-val">{{ ytd_workouts }}</div>
     <div class="stat-label">Workouts</div>
@@ -37,8 +37,8 @@
 </div>
 
 <!-- Streak row -->
-
-<div class="card card-sm" style="margin-bottom:10px;display:flex;align-items:center;gap:0;">
+<a href="{{ url_for('main.calendar') }}" style="text-decoration:none;color:inherit;display:block;">
+<div class="card card-sm" style="margin-bottom:10px;display:flex;align-items:center;gap:0;cursor:pointer;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
   <div style="flex:1;text-align:center;padding:4px 0;">
     <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;
       color:{% if current_streak >= 7 %}#ff4d00{% elif current_streak >= 3 %}var(--accent){% else %}var(--text){% endif %};">
@@ -54,6 +54,7 @@
     <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-top:2px;">Best Streak</div>
   </div>
 </div>
+</a>
 <!-- Calories row -->
 {% if ytd_calories %}
 <div class="card card-sm" style="margin-bottom:10px;display:flex;align-items:center;gap:14px;">
