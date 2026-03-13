@@ -320,3 +320,112 @@ def _time_to_seconds(t):
             return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
     except (ValueError, IndexError):
         return None
+
+
+# ── Edit Workout ───────────────────────────────────────────
+@workouts_bp.route('/<int:workout_id>/edit', methods=['GET', 'POST'])
+def edit(workout_id):
+    workout   = Workout.query.get_or_404(workout_id)
+    exercises = Exercise.query.order_by(Exercise.name).all()
+    wtype     = workout.workout_type
+
+    if request.method == 'POST':
+        f = request.form
+
+        # ── Update base workout fields ──────────────────────
+        workout.name             = f.get('name', workout.name)
+        workout.location         = f.get('location', workout.location)
+        workout.duration_minutes = int(f['duration_minutes']) if f.get('duration_minutes') else None
+        workout.calories         = int(f['calories'])         if f.get('calories')         else None
+        workout.avg_bpm          = int(f['avg_bpm'])          if f.get('avg_bpm')          else None
+        workout.notes            = f.get('notes')
+        if f.get('completed_at'):
+            workout.completed_at = datetime.fromisoformat(f['completed_at'])
+
+        # ── Strength ────────────────────────────────────────
+        if wtype == 'strength':
+            # Delete existing sets and re-insert
+            WorkoutSet.query.filter_by(workout_id=workout.id).delete()
+            i = 0
+            while f.get(f'sets[{i}][exercise_id]'):
+                weight_raw = f.get(f'sets[{i}][weight]') or None
+                unit       = f.get(f'sets[{i}][unit]', 'lbs')
+                weight_kg = weight_lbs = None
+                if weight_raw:
+                    w = float(weight_raw)
+                    if unit == 'lbs':
+                        weight_lbs = w; weight_kg = lbs_to_kg(w)
+                    else:
+                        weight_kg = w; weight_lbs = w * 2.20462
+                db.session.add(WorkoutSet(
+                    workout_id  = workout.id,
+                    exercise_id = int(f[f'sets[{i}][exercise_id]']),
+                    set_number  = int(f.get(f'sets[{i}][set_number]', i + 1)),
+                    weight_kg   = weight_kg,
+                    weight_lbs  = weight_lbs,
+                    reps        = int(f[f'sets[{i}][reps]'])   if f.get(f'sets[{i}][reps]')   else None,
+                    rpe         = float(f[f'sets[{i}][rpe]'])  if f.get(f'sets[{i}][rpe]')    else None,
+                    notes       = f.get(f'sets[{i}][notes]'),
+                ))
+                i += 1
+
+        # ── Circuit / AMRAP ─────────────────────────────────
+        elif wtype in ('circuit', 'amrap'):
+            circuit = workout.circuits.first()
+            if circuit:
+                circuit.rounds_completed = float(f['rounds_completed']) if f.get('rounds_completed') else None
+                circuit.rounds_target    = int(f['rounds_target'])      if f.get('rounds_target')    else None
+                circuit.total_time_s     = _time_to_seconds(f.get('total_time'))
+                circuit.time_cap_s       = _time_to_seconds(f.get('time_cap'))
+                circuit.notes            = f.get('circuit_notes')
+
+                # Update per-exercise round sets
+                for ce in circuit.exercises.all():
+                    # Delete existing round sets for this exercise
+                    CircuitRoundSet.query.filter_by(circuit_exercise_id=ce.id).delete()
+                    r = 1
+                    while f.get(f'ce[{ce.id}][round][{r}][reps]') is not None or \
+                          f.get(f'ce[{ce.id}][round][{r}][duration]') is not None or \
+                          f.get(f'ce[{ce.id}][round][{r}][weight]') is not None:
+                        reps_val = f.get(f'ce[{ce.id}][round][{r}][reps]')
+                        dur_val  = f.get(f'ce[{ce.id}][round][{r}][duration]')
+                        w_val    = f.get(f'ce[{ce.id}][round][{r}][weight]')
+                        if reps_val or dur_val or w_val:
+                            w = float(w_val) if w_val else None
+                            db.session.add(CircuitRoundSet(
+                                circuit_exercise_id = ce.id,
+                                round_number        = r,
+                                reps       = int(reps_val) if reps_val else None,
+                                duration_s = _time_to_seconds(dur_val),
+                                weight_lbs = w,
+                                weight_kg  = lbs_to_kg(w) if w else None,
+                            ))
+                        r += 1
+
+        # ── Run ─────────────────────────────────────────────
+        elif wtype == 'run':
+            run = workout.runs.first()
+            if run:
+                run.total_distance_km = float(f['total_distance_km']) if f.get('total_distance_km') else None
+                run.total_duration_s  = _time_to_seconds(f.get('total_duration'))
+                run.route_notes       = f.get('route_notes')
+                # Update segments
+                RunSegment.query.filter_by(run_id=run.id).delete()
+                i = 0
+                while f.get(f'segs[{i}][type]'):
+                    db.session.add(RunSegment(
+                        run_id         = run.id,
+                        segment_type   = f[f'segs[{i}][type]'],
+                        segment_number = int(f.get(f'segs[{i}][num]', i)),
+                        distance_km    = float(f[f'segs[{i}][dist]']) if f.get(f'segs[{i}][dist]') else None,
+                        duration_s     = _time_to_seconds(f.get(f'segs[{i}][dur]')),
+                        skipped        = bool(f.get(f'segs[{i}][skipped]')),
+                    ))
+                    i += 1
+
+        db.session.commit()
+        return redirect(url_for('workouts.view', workout_id=workout.id))
+
+    # GET — render edit form
+    return render_template('workouts/edit.html', workout=workout, exercises=exercises,
+                           locations=LOCATION_CHOICES)
