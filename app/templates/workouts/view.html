@@ -121,8 +121,12 @@
                 {% endif %}
               </td>
               {% if has_weight %}
+              {% set is_pr = pr_map is defined and s.exercise_id in pr_map and s.weight_lbs and (s.weight_lbs|float == pr_map[s.exercise_id]) %}
               <td style="padding:8px 6px;text-align:right;font-family:'DM Mono',monospace;font-size:15px;font-weight:600;">
                 {% if s.weight_lbs or s.weight_kg %}
+                  {% if is_pr %}
+                  <span style="font-size:9px;background:#ff4d00;color:#fff;padding:1px 4px;border-radius:3px;font-weight:700;vertical-align:middle;margin-right:3px;">PR</span>
+                  {% endif %}
                   {% if weight_unit == 'lbs' %}
                     {% set display_w = s.weight_lbs|float if s.weight_lbs else (s.weight_kg|float * 2.20462) %}
                     {{ display_w|int }}
@@ -177,13 +181,13 @@
   {% for seg in active_segs %}
     {% if seg.distance_km %}{% set seg_dist.km = seg_dist.km + seg.distance_km|float %}{% endif %}
   {% endfor %}
-  {% set display_dist = run.total_distance_km|float if run.total_distance_km else seg_dist.km %}
+  {% set display_dist = (run.total_distance_km | float) if run.total_distance_km is not none else seg_dist.km %}
 
   <div class="card" style="margin-bottom:10px;">
     <div class="stat-grid" style="margin-bottom:12px;">
       <div class="stat-box">
         <div class="stat-val" style="font-size:26px;color:var(--run);">
-          {% if display_dist > 0 %}{{ "%.2f"|format(display_dist) }} km{% else %}—{% endif %}
+          {% if display_dist and display_dist > 0 %}{{ "%.2f"|format(display_dist | float) }} km{% else %}—{% endif %}
         </div>
         <div class="stat-label">Distance</div>
       </div>
@@ -215,7 +219,7 @@
           {% if seg.distance_km %}{{ "%.2f"|format(seg.distance_km|float) }}km{% endif %}
         </span>
         <span style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600;color:var(--run);">
-          {% if seg.duration_s %}{{ seg.duration_s//60 }}:{{ "%02d"|format(seg.duration_s%60) }}{% elif seg.skipped %}skip{% else %}—{% endif %}
+          {% if seg.duration_s %}{{ (seg.duration_s | int)//60 }}:{{ "%02d"|format((seg.duration_s | int)%60) }}{% elif seg.skipped %}skip{% else %}—{% endif %}
         </span>
         {% if seg.avg_bpm %}<span style="font-size:11px;color:#ff4466;">{{ seg.avg_bpm }}bpm</span>{% endif %}
       </div>
@@ -267,7 +271,7 @@
       </div>
       <div class="stat-box">
         <div class="stat-val" style="font-size:22px;">
-          {% if c.total_time_s %}{{ c.total_time_s//60 }}:{{ "%02d"|format(c.total_time_s%60) }}
+          {% if c.total_time_s %}{{ (c.total_time_s | int)//60 }}:{{ "%02d"|format((c.total_time_s | int)%60) }}
           {% elif c.time_cap_s %}{{ c.time_cap_s//60 }} min cap
           {% else %}—{% endif %}
         </div>
@@ -298,7 +302,7 @@
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-family:'DM Mono',monospace;font-size:12px;min-width:60px;text-align:center;">
           <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;">R{{ rs.round_number }}</div>
           {% if rs.duration_s %}
-            <div style="color:var(--run);font-weight:600;">{{ rs.duration_s//60 }}:{{ "%02d"|format(rs.duration_s%60) }}</div>
+            <div style="color:var(--run);font-weight:600;">{{ (rs.duration_s | int)//60 }}:{{ "%02d"|format((rs.duration_s | int)%60) }}</div>
           {% endif %}
           {% if rs.reps %}
             <div style="color:var(--accent);font-weight:600;">{{ rs.reps }}{% if rs.weight_lbs %}<span style="font-size:10px;color:var(--muted);">×{{ rs.weight_lbs|float|int }}</span>{% endif %}</div>

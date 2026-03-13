@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, session, redirect, request, url_for, current_app
 from sqlalchemy import func, extract
-from datetime import datetime
+from datetime import datetime, timedelta, date
 from ..models import db, Workout, WorkoutSet, Run, WorkoutPlan, HyroxResult
 
 main_bp = Blueprint('main', __name__)
@@ -43,6 +43,38 @@ def index():
         Workout.calories.isnot(None)
     ).scalar() or 0
 
+    # ── Streaks ────────────────────────────────────────────
+    # Get all distinct workout dates (local date, deduplicated)
+    all_dates_raw = db.session.query(
+        func.date(Workout.completed_at)
+    ).order_by(func.date(Workout.completed_at).desc()).distinct().all()
+    all_dates = sorted(set(r[0] for r in all_dates_raw), reverse=True)
+
+    today = datetime.utcnow().date()
+    current_streak = 0
+    longest_streak = 0
+
+    if all_dates:
+        # Current streak — count back from today or yesterday
+        check = today
+        for d in all_dates:
+            if d == check or d == check - timedelta(days=1):
+                current_streak += 1
+                check = d - timedelta(days=1)
+            elif d < check - timedelta(days=1):
+                break
+
+        # Longest streak — sliding window over sorted ascending dates
+        asc = sorted(all_dates)
+        run = 1
+        for i in range(1, len(asc)):
+            if (asc[i] - asc[i-1]).days == 1:
+                run += 1
+                longest_streak = max(longest_streak, run)
+            else:
+                run = 1
+        longest_streak = max(longest_streak, run)
+
     last_workout = Workout.query.order_by(Workout.completed_at.desc()).first()
     active_plan  = WorkoutPlan.query.filter_by(is_active=True).first()
     recent_workouts = Workout.query.order_by(Workout.completed_at.desc()).limit(6).all()
@@ -72,6 +104,8 @@ def index():
         type_counts=dict(type_counts),
         location_counts=dict(location_counts),
         year=year,
+        current_streak=current_streak,
+        longest_streak=longest_streak,
     )
 
 

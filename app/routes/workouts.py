@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from flask import Blueprint, render_template, request, redirect, url_for
 from datetime import datetime
 from ..models import (db, Workout, WorkoutSet, Exercise, Run, RunSegment,
@@ -31,7 +32,25 @@ def history():
 @workouts_bp.route('/<int:workout_id>')
 def view(workout_id):
     workout = Workout.query.get_or_404(workout_id)
-    return render_template('workouts/view.html', workout=workout)
+
+    # Build PR map: for each exercise in this workout, what was the all-time
+    # max weight_lbs BEFORE (or on) this workout date?
+    # A set is a PR if its weight equals that all-time max.
+    pr_map = {}   # exercise_id -> all-time max weight_lbs (up to this workout)
+    if workout.workout_type == 'strength':
+        ex_ids = db.session.query(WorkoutSet.exercise_id).filter_by(
+            workout_id=workout.id).distinct().all()
+        for (ex_id,) in ex_ids:
+            max_w = db.session.query(func.max(WorkoutSet.weight_lbs))                 .join(Workout)                 .filter(
+                    WorkoutSet.exercise_id == ex_id,
+                    WorkoutSet.skipped == False,
+                    WorkoutSet.weight_lbs.isnot(None),
+                    Workout.completed_at <= workout.completed_at,
+                ).scalar()
+            if max_w:
+                pr_map[ex_id] = float(max_w)
+
+    return render_template('workouts/view.html', workout=workout, pr_map=pr_map)
 
 
 # ── Delete ─────────────────────────────────────────────────
@@ -86,6 +105,20 @@ def log_strength():
                 notes       = f.get(f'sets[{i}][notes]'),
             ))
             i += 1
+
+        # Inline cardio sets
+        j = 0
+        while f.get(f'cardio[{j}][machine]'):
+            db.session.add(CardioSet(
+                workout_id   = workout.id,
+                machine      = f[f'cardio[{j}][machine]'],
+                set_number   = j + 1,
+                distance_m   = int(f[f'cardio[{j}][distance_m]']) if f.get(f'cardio[{j}][distance_m]') else None,
+                duration_s   = _time_to_seconds(f.get(f'cardio[{j}][duration]')),
+                calories     = int(f[f'cardio[{j}][calories]'])   if f.get(f'cardio[{j}][calories]')   else None,
+                damper       = int(f[f'cardio[{j}][damper]'])     if f.get(f'cardio[{j}][damper]')     else None,
+            ))
+            j += 1
 
         db.session.commit()
         return redirect(url_for('workouts.view', workout_id=workout.id))
@@ -429,3 +462,45 @@ def edit(workout_id):
     # GET — render edit form
     return render_template('workouts/edit.html', workout=workout, exercises=exercises,
                            locations=LOCATION_CHOICES)
+
+
+# ── Exercise history + PR (HTMX) ───────────────────────────
+@workouts_bp.route('/htmx/exercise-history')
+def htmx_exercise_history():
+    ex_id = request.args.get('exercise_id', type=int)
+    if not ex_id:
+        return ('', 204)
+
+    # Last session that used this exercise
+    last_set = (
+        db.session.query(WorkoutSet)
+        .join(Workout)
+        .filter(WorkoutSet.exercise_id == ex_id, WorkoutSet.skipped == False)
+        .order_by(Workout.completed_at.desc())
+        .first()
+    )
+    if not last_set:
+        return render_template('partials/exercise_history.html',
+                               last_sets=[], pr_lbs=None, last_date=None)
+
+    last_workout_id = last_set.workout_id
+    last_date       = last_set.workout.completed_at
+
+    last_sets = (
+        db.session.query(WorkoutSet)
+        .filter(WorkoutSet.workout_id == last_workout_id,
+                WorkoutSet.exercise_id == ex_id,
+                WorkoutSet.skipped == False)
+        .order_by(WorkoutSet.set_number)
+        .all()
+    )
+
+    pr_lbs = db.session.query(func.max(WorkoutSet.weight_lbs)) \
+        .filter(WorkoutSet.exercise_id == ex_id,
+                WorkoutSet.skipped == False) \
+        .scalar()
+
+    return render_template('partials/exercise_history.html',
+                           last_sets=last_sets,
+                           pr_lbs=float(pr_lbs) if pr_lbs else None,
+                           last_date=last_date)
