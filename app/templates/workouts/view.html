@@ -1,0 +1,346 @@
+{% extends 'base.html' %}
+{% block title %}{{ workout.name }}{% endblock %}
+
+{% block content %}
+
+<!-- Back button -->
+<div style="margin-bottom:12px;">
+  <a href="{{ url_for('workouts.history') }}" class="btn btn-secondary btn-sm">← Back</a>
+</div>
+
+<!-- Header -->
+<div style="margin-bottom:12px;">
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+    <span class="badge badge-{{ workout.workout_type }}">{{ workout.workout_type }}</span>
+    {% if workout.location %}
+    <span class="badge" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);">
+      {{ '🏋️' if workout.location == 'gym' else ('🏠' if workout.location == 'home' else ('🌳' if workout.location == 'outdoor' else '📍')) }}
+      {{ workout.location|title }}
+    </span>
+    {% endif %}
+  </div>
+  <h1 style="font-size:36px;line-height:1;">{{ workout.name }}</h1>
+  <p style="color:var(--muted);font-size:13px;margin-top:4px;">{{ workout.completed_at.strftime('%A, %B %-d %Y · %-I:%M %p') }}</p>
+</div>
+
+<!-- Session stats -->
+{% if workout.duration_minutes or workout.calories or workout.avg_bpm %}
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+  {% if workout.duration_minutes %}
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:70px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);">{{ workout.duration_minutes }}</div>
+    <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">min</div>
+  </div>
+  {% endif %}
+  {% if workout.calories %}
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:70px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:#ff6b35;">{{ workout.calories }}</div>
+    <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">cal</div>
+  </div>
+  {% endif %}
+  {% if workout.avg_bpm %}
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:70px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:#ff4466;">{{ workout.avg_bpm }}</div>
+    <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">bpm</div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Cardio sets (visible on any workout type) -->
+{% set cslist = workout.cardio_sets.all() %}
+{% if cslist %}
+<div class="card" style="margin-bottom:10px;">
+  <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">CARDIO / MACHINE</div>
+  {% for cs in cslist %}
+  <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+    <span style="font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);padding:2px 6px;border-radius:4px;color:var(--run);min-width:50px;text-align:center;">{{ cs.machine|upper }}</span>
+    <span style="flex:1;font-size:13px;">{% if cs.distance_m %}{{ cs.distance_m }}m{% endif %}</span>
+    <span style="font-family:'DM Mono',monospace;font-size:13px;color:var(--run);">
+      {% if cs.duration_s %}{% set m=cs.duration_s//60 %}{% set s=cs.duration_s%60 %}{{ m }}:{{ "%02d"|format(s) }}{% else %}—{% endif %}
+    </span>
+    {% if cs.damper %}<span style="font-size:11px;color:var(--muted);">D{{ cs.damper }}</span>{% endif %}
+    {% if cs.notes %}<span style="font-size:11px;color:var(--muted);">{{ cs.notes }}</span>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% set wtype = workout.workout_type %}
+
+<!-- ── STRENGTH ── -->
+{% if wtype == 'strength' %}
+  {% set sets = workout.sets.all() %}
+  {% if sets %}
+    {# Group sets by exercise name #}
+    {% set exercises = {} %}
+    {% for s in sets %}
+      {% if s.exercise.name not in exercises %}{% set _ = exercises.update({s.exercise.name: []}) %}{% endif %}
+      {% set _ = exercises[s.exercise.name].append(s) %}
+    {% endfor %}
+
+    {% for ex_name, ex_sets in exercises.items() %}
+    <div class="card" style="margin-bottom:10px;">
+      <div style="font-weight:600;margin-bottom:12px;font-size:16px;">{{ ex_name }}</div>
+
+      {# Check if any set has steps/distance/weight - use ns loop (selectattr unreliable on Numeric) #}
+      {% set chk = namespace(has_weight=false, has_steps=false, has_distance=false) %}
+      {% for s in ex_sets %}
+        {% if s.weight_lbs is not none or s.weight_kg is not none %}{% set chk.has_weight = true %}{% endif %}
+        {% if s.steps is not none %}{% set chk.has_steps = true %}{% endif %}
+        {% if s.distance_m is not none %}{% set chk.has_distance = true %}{% endif %}
+      {% endfor %}
+      {% set has_weight   = chk.has_weight %}
+      {% set has_steps    = chk.has_steps %}
+      {% set has_distance = chk.has_distance %}
+
+      {# Horizontal scroll table so sets read left-to-right #}
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;min-width:200px;">
+          <thead>
+            <tr style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">
+              <th style="padding:4px 6px;text-align:left;">Set</th>
+              {% if has_weight   %}<th style="padding:4px 6px;text-align:right;">Weight</th>{% endif %}
+              {% if has_steps    %}<th style="padding:4px 6px;text-align:right;">Steps</th>{% endif %}
+              {% if has_distance %}<th style="padding:4px 6px;text-align:right;">Dist</th>{% endif %}
+              {% if not has_steps and not has_distance %}<th style="padding:4px 6px;text-align:right;">Reps</th>{% endif %}
+              {% set has_rpe = namespace(v=false) %}{% for s in ex_sets %}{% if s.rpe is not none %}{% set has_rpe.v = true %}{% endif %}{% endfor %}{% if has_rpe.v %}
+              <th style="padding:4px 6px;text-align:right;">RPE</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in ex_sets %}
+            {% if not s.skipped %}
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:8px 6px;font-family:'DM Mono',monospace;color:var(--muted);font-size:13px;">
+                {% if s.is_assisted %}
+                  <span style="color:#aaa;">asst</span>
+                {% else %}
+                  {{ s.set_number }}
+                {% endif %}
+              </td>
+              {% if has_weight %}
+              <td style="padding:8px 6px;text-align:right;font-family:'DM Mono',monospace;font-size:15px;font-weight:600;">
+                {% if s.weight_lbs or s.weight_kg %}
+                  {% if weight_unit == 'lbs' %}
+                    {% set display_w = s.weight_lbs|float if s.weight_lbs else (s.weight_kg|float * 2.20462) %}
+                    {{ display_w|int }}
+                    <span style="font-size:10px;color:var(--muted);font-weight:400;">lbs</span>
+                  {% else %}
+                    {% set display_w = s.weight_kg|float if s.weight_kg else (s.weight_lbs|float / 2.20462) %}
+                    {{ "%.1f"|format(display_w) }}
+                    <span style="font-size:10px;color:var(--muted);font-weight:400;">kg</span>
+                  {% endif %}
+                  {% if s.is_assisted %}<span style="font-size:10px;color:#aaa;"> (-{{ s.assist_weight|float|int }} assist)</span>{% endif %}
+                {% else %}—{% endif %}
+              </td>
+              {% endif %}
+              {% if has_steps %}
+              <td style="padding:8px 6px;text-align:right;font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:var(--accent);">
+                {{ s.steps or '—' }}
+              </td>
+              {% endif %}
+              {% if has_distance %}
+              <td style="padding:8px 6px;text-align:right;font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:var(--accent);">
+                {{ s.distance_m|float|int if s.distance_m else '—' }}m
+              </td>
+              {% endif %}
+              {% if not has_steps and not has_distance %}
+              <td style="padding:8px 6px;text-align:right;font-family:'DM Mono',monospace;font-size:15px;font-weight:600;color:var(--accent);">
+                {{ s.reps or '—' }}
+              </td>
+              {% endif %}
+              {% if has_rpe.v %}
+              <td style="padding:8px 6px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);">
+                {{ s.rpe|float if s.rpe else '—' }}
+              </td>
+              {% endif %}
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if ex_sets[0].notes %}<p style="font-size:12px;color:var(--muted);margin-top:8px;">{{ ex_sets[0].notes }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  {% endif %}
+
+<!-- ── RUN ── -->
+{% elif wtype == 'run' %}
+  {% for run in workout.runs.all() %}
+  {% set segments = run.segments.all() %}
+  {% set active_segs = segments | rejectattr('skipped') | list %}
+  {# Compute total distance from segments if not stored on run directly #}
+  {% set seg_dist = namespace(km=0) %}
+  {% for seg in active_segs %}
+    {% if seg.distance_km %}{% set seg_dist.km = seg_dist.km + seg.distance_km|float %}{% endif %}
+  {% endfor %}
+  {% set display_dist = run.total_distance_km|float if run.total_distance_km else seg_dist.km %}
+
+  <div class="card" style="margin-bottom:10px;">
+    <div class="stat-grid" style="margin-bottom:12px;">
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:26px;color:var(--run);">
+          {% if display_dist > 0 %}{{ "%.2f"|format(display_dist) }} km{% else %}—{% endif %}
+        </div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:26px;color:var(--run);">
+          {% if run.total_duration_s %}
+            {% set h=run.total_duration_s//3600 %}{% set m=(run.total_duration_s%3600)//60 %}{% set s=run.total_duration_s%60 %}
+            {% if h %}{{ h }}:{{ "%02d"|format(m) }}:{{ "%02d"|format(s) }}{% else %}{{ m }}:{{ "%02d"|format(s) }}{% endif %}
+          {% else %}—{% endif %}
+        </div>
+        <div class="stat-label">Time</div>
+      </div>
+    </div>
+    {% if run.avg_heart_rate %}<p style="font-size:13px;color:var(--muted);margin-bottom:8px;">❤️ {{ run.avg_heart_rate }} bpm</p>{% endif %}
+    {% if run.route_notes %}<p style="font-size:13px;color:var(--muted);margin-bottom:8px;">📍 {{ run.route_notes }}</p>{% endif %}
+
+    {% if segments %}
+    <div style="margin-top:8px;">
+      {% for seg in segments %}
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);{% if seg.skipped %}opacity:0.35;{% endif %}">
+        {% if seg.segment_type == 'warmup' %}{% set seg_color = '#ffaa00' %}
+        {% elif seg.segment_type == 'interval' %}{% set seg_color = 'var(--run)' %}
+        {% elif seg.segment_type == 'cooldown' %}{% set seg_color = '#888' %}
+        {% else %}{% set seg_color = 'var(--muted)' %}{% endif %}
+        <span style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;min-width:60px;color:{{ seg_color }};">
+          {{ seg.segment_type }}{% if seg.segment_type == 'interval' %} {{ seg.segment_number }}{% endif %}
+        </span>
+        <span style="flex:1;font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);">
+          {% if seg.distance_km %}{{ "%.2f"|format(seg.distance_km|float) }}km{% endif %}
+        </span>
+        <span style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600;color:var(--run);">
+          {% if seg.duration_s %}{{ seg.duration_s//60 }}:{{ "%02d"|format(seg.duration_s%60) }}{% elif seg.skipped %}skip{% else %}—{% endif %}
+        </span>
+        {% if seg.avg_bpm %}<span style="font-size:11px;color:#ff4466;">{{ seg.avg_bpm }}bpm</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+<!-- ── HYROX ── -->
+{% elif wtype == 'hyrox' %}
+  {% for h in workout.hyrox.all() %}
+  <div class="card" style="margin-bottom:10px;">
+    <div class="stat-grid" style="margin-bottom:12px;">
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:22px;color:var(--hyrox);">
+          {% if h.total_time_s %}{{ h.total_time_s//3600 }}:{{ "%02d"|format((h.total_time_s%3600)//60) }}:{{ "%02d"|format(h.total_time_s%60) }}{% else %}—{% endif %}
+        </div>
+        <div class="stat-label">Total Time</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:22px;">{{ h.race_type|title }}</div>
+        <div class="stat-label">Race Type</div>
+      </div>
+    </div>
+    {% if h.location %}<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">📍 {{ h.location }}</p>{% endif %}
+    {% for station in h.stations.order_by('station_order').all() %}
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);min-width:18px;">{{ station.station_order }}</span>
+      <span style="flex:1;font-size:13px;font-weight:500;">{{ station.station_name }}</span>
+      <span style="font-family:'DM Mono',monospace;font-size:13px;color:var(--hyrox);">
+        {% if station.time_s %}{{ station.time_s//60 }}:{{ "%02d"|format(station.time_s%60) }}{% else %}—{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+<!-- ── CIRCUIT / AMRAP ── -->
+{% elif wtype in ('circuit', 'amrap') %}
+  {% for c in workout.circuits.all() %}
+  <div class="card" style="margin-bottom:10px;">
+    <div class="stat-grid" style="margin-bottom:12px;">
+      <div class="stat-box">
+        <div class="stat-val" style="color:{{ 'var(--amrap)' if wtype=='amrap' else 'var(--circuit)' }};">
+          {{ c.rounds_completed or '—' }}{% if c.rounds_target %}/{{ c.rounds_target }}{% endif %}
+        </div>
+        <div class="stat-label">Rounds</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:22px;">
+          {% if c.total_time_s %}{{ c.total_time_s//60 }}:{{ "%02d"|format(c.total_time_s%60) }}
+          {% elif c.time_cap_s %}{{ c.time_cap_s//60 }} min cap
+          {% else %}—{% endif %}
+        </div>
+        <div class="stat-label">Time</div>
+      </div>
+    </div>
+
+    {% for ce in c.exercises %}
+    {% set round_sets = ce.round_sets.order_by('round_number').all() %}
+    <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border);">
+
+      {# Exercise header row #}
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;">
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">{{ loop.index }}</span>
+        <span style="font-size:14px;font-weight:600;">{{ ce.exercise.name }}</span>
+        <span style="font-size:11px;color:var(--muted);margin-left:auto;">
+          {% if ce.target_reps %}target: {{ ce.target_reps }} reps{% endif %}
+          {% if ce.target_weight_lbs and weight_unit == 'lbs' %} @ {{ ce.target_weight_lbs|float|int }}lbs{% endif %}
+          {% if ce.target_distance_m %}{{ ce.target_distance_m }}m{% endif %}
+        </span>
+      </div>
+
+      {% if round_sets %}
+      {# Per-round data as horizontal chips #}
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        {% for rs in round_sets %}
+        {% if not rs.skipped %}
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-family:'DM Mono',monospace;font-size:12px;min-width:60px;text-align:center;">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;">R{{ rs.round_number }}</div>
+          {% if rs.duration_s %}
+            <div style="color:var(--run);font-weight:600;">{{ rs.duration_s//60 }}:{{ "%02d"|format(rs.duration_s%60) }}</div>
+          {% endif %}
+          {% if rs.reps %}
+            <div style="color:var(--accent);font-weight:600;">{{ rs.reps }}{% if rs.weight_lbs %}<span style="font-size:10px;color:var(--muted);">×{{ rs.weight_lbs|float|int }}</span>{% endif %}</div>
+          {% endif %}
+          {% if rs.distance_m %}
+            <div style="color:var(--muted);font-size:11px;">{{ rs.distance_m|float|int }}m</div>
+          {% endif %}
+          {% if rs.steps %}
+            <div style="color:var(--accent);font-weight:600;">{{ rs.steps }}
+            <span style="font-size:9px;color:var(--muted);">steps</span></div>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="font-size:12px;color:var(--muted);font-style:italic;">No per-round data</p>
+      {% endif %}
+
+    </div>
+    {% endfor %}
+
+    {% if c.notes %}<p style="font-size:12px;color:var(--muted);margin-top:4px;">{{ c.notes }}</p>{% endif %}
+  </div>
+  {% endfor %}
+{% endif %}
+
+<!-- Notes -->
+{% if workout.notes %}
+<div class="card" style="margin-bottom:10px;">
+  <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">NOTES</div>
+  <p style="font-size:14px;">{{ workout.notes }}</p>
+</div>
+{% endif %}
+
+<!-- Delete -->
+<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
+  <form method="post" action="{{ url_for('workouts.delete', workout_id=workout.id) }}"
+        onsubmit="return confirm('Delete this workout?')">
+    <button type="submit" class="btn btn-secondary btn-full" style="color:#ff4466;border-color:#ff4466;">
+      Delete Workout
+    </button>
+  </form>
+</div>
+
+{% endblock %}

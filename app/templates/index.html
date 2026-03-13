@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block title %}FORGE — Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ year }} STATS</h1>
+  <p>Your year at a glance</p>
+</div>
+
+<!-- YTD Stats -->
+<div class="stat-grid four" style="margin-bottom:10px;">
+  <div class="stat-box">
+    <div class="stat-val">{{ ytd_workouts }}</div>
+    <div class="stat-label">Workouts</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val" style="font-size:24px;">
+      {% if weight_unit == 'lbs' %}
+        {{ "{:,.0f}".format(ytd_weight) }}
+      {% else %}
+        {{ "{:,.0f}".format(ytd_weight / 2.20462) }}
+      {% endif %}
+    </div>
+    <div class="stat-label">{{ weight_unit }} Lifted</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val">{{ "%.1f"|format(ytd_distance) }}</div>
+    <div class="stat-label">km Run</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val" style="font-size:24px;">
+      {% set h = ytd_run_time // 3600 %}{% set m = (ytd_run_time % 3600) // 60 %}
+      {{ h }}h{{ m }}m
+    </div>
+    <div class="stat-label">Run Time</div>
+  </div>
+</div>
+
+<!-- Calories row -->
+{% if ytd_calories %}
+<div class="card card-sm" style="margin-bottom:10px;display:flex;align-items:center;gap:14px;">
+  <span style="font-size:20px;">🔥</span>
+  <div>
+    <span style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:#ff6b35;">{{ "{:,.0f}".format(ytd_calories) }}</span>
+    <span style="font-size:12px;color:var(--muted);margin-left:6px;text-transform:uppercase;letter-spacing:0.08em;">calories burned {{ year }}</span>
+  </div>
+</div>
+{% endif %}
+
+<!-- Type + location badges -->
+<div class="card card-sm" style="margin-bottom:12px;">
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+    {% for wtype, count in type_counts.items() %}
+      <span class="badge badge-{{ wtype }}">{{ wtype }} × {{ count }}</span>
+    {% endfor %}
+    {% for loc, count in location_counts.items() %}
+      <span class="badge" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);">
+        {{ '🏋️' if loc == 'gym' else ('🏠' if loc == 'home' else '🌳') }} {{ loc }} × {{ count }}
+      </span>
+    {% endfor %}
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- Active Plan -->
+<div class="section-header">
+  <h2>ACTIVE PLAN</h2>
+  <a href="{{ url_for('plans.index') }}" class="btn btn-secondary btn-sm">All Plans</a>
+</div>
+
+{% if active_plan %}
+<div class="card" style="border-color:var(--accent);margin-bottom:16px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <span class="badge" style="background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);">● ACTIVE</span>
+    <form method="post" action="{{ url_for('plans.deactivate', plan_id=active_plan.id) }}" style="display:inline">
+      <button class="btn btn-secondary btn-sm" type="submit">Deactivate</button>
+    </form>
+  </div>
+  <h3 style="font-size:24px;margin-bottom:4px;">{{ active_plan.name }}</h3>
+  {% if active_plan.description %}<p style="font-size:13px;color:var(--muted);">{{ active_plan.description }}</p>{% endif %}
+  <div style="margin-top:12px;">
+    <a href="{{ url_for('plans.view', plan_id=active_plan.id) }}" class="btn btn-secondary btn-sm">View Plan →</a>
+  </div>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:28px 20px;margin-bottom:16px;">
+  <div style="font-size:32px;margin-bottom:8px;">📋</div>
+  <div style="font-weight:600;margin-bottom:4px;">No active plan</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">Set a training plan to track your progress</div>
+  <a href="{{ url_for('plans.index') }}" class="btn btn-primary btn-sm">Browse Plans</a>
+</div>
+{% endif %}
+
+<hr class="divider">
+
+<!-- Last Workout -->
+<div class="section-header">
+  <h2>LAST WORKOUT</h2>
+  <a href="{{ url_for('workouts.history') }}" class="btn btn-secondary btn-sm">History</a>
+</div>
+
+{% if last_workout %}
+<a href="{{ url_for('workouts.view', workout_id=last_workout.id) }}" class="workout-row" style="margin-bottom:16px;">
+  <div style="display:flex;flex-direction:column;gap:4px;">
+    <span class="badge badge-{{ last_workout.workout_type }}">{{ last_workout.workout_type }}</span>
+    <span style="font-size:10px;color:var(--muted);">
+      {{ '🏋️' if last_workout.location == 'gym' else '🏠' }} {{ last_workout.location }}
+    </span>
+  </div>
+  <div class="wr-info">
+    <div class="wr-name">{{ last_workout.name }}</div>
+    <div class="wr-meta">
+      {{ last_workout.completed_at.strftime('%a %b %-d, %Y') }}
+      {% if last_workout.duration_minutes %} · {{ last_workout.duration_minutes }}min{% endif %}
+      {% if last_workout.calories %} · {{ last_workout.calories }}cal{% endif %}
+      {% if last_workout.avg_bpm %} · {{ last_workout.avg_bpm }}bpm{% endif %}
+    </div>
+  </div>
+  <div class="wr-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></div>
+</a>
+{% else %}
+<div class="card" style="text-align:center;color:var(--muted);padding:28px;">
+  No workouts logged yet. Hit the + to start.
+</div>
+{% endif %}
+
+{% if recent_workouts|length > 1 %}
+<div class="section-header" style="margin-top:8px;">
+  <h2>RECENT</h2>
+</div>
+{% for w in recent_workouts[1:] %}
+<a href="{{ url_for('workouts.view', workout_id=w.id) }}" class="workout-row">
+  <div><span class="badge badge-{{ w.workout_type }}">{{ w.workout_type }}</span></div>
+  <div class="wr-info">
+    <div class="wr-name">{{ w.name }}</div>
+    <div class="wr-meta">
+      {{ w.completed_at.strftime('%a %b %-d') }}
+      {% if w.duration_minutes %} · {{ w.duration_minutes }}min{% endif %}
+      {% if w.calories %} · {{ w.calories }}cal{% endif %}
+    </div>
+  </div>
+  <div class="wr-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></div>
+</a>
+{% endfor %}
+{% endif %}
+{% endblock %}

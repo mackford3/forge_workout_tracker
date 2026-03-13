@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}{{ plan.name }}{% endblock %}
+
+{% block content %}
+<div style="padding-top:16px;margin-bottom:12px;">
+  <a href="{{ url_for('plans.index') }}" style="color:var(--muted);text-decoration:none;font-size:13px;">← Plans</a>
+</div>
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:16px;">
+  <div>
+    {% if plan.is_active %}
+    <span class="badge" style="background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);margin-bottom:8px;">● ACTIVE</span>
+    {% endif %}
+    <h1 style="font-size:34px;line-height:1;">{{ plan.name }}</h1>
+    {% if plan.description %}<p style="color:var(--muted);font-size:13px;margin-top:4px;">{{ plan.description }}</p>{% endif %}
+  </div>
+  {% if not plan.is_active %}
+  <form method="post" action="{{ url_for('plans.activate', plan_id=plan.id) }}">
+    <button type="submit" class="btn btn-primary btn-sm">Set Active</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if weeks %}
+  {% for week_num, days in weeks.items()|sort %}
+  <div style="margin-bottom:20px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+      WEEK {{ week_num }}
+    </div>
+    {% for day in days %}
+    <div class="card card-sm" style="margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);padding:4px 8px;border-radius:4px;color:var(--accent);">{{ day.day_of_week }}</span>
+        <div style="flex:1;">
+          <div style="font-weight:600;font-size:14px;">{{ day.name or 'Rest / Unplanned' }}</div>
+          {% if day.notes %}<div style="font-size:12px;color:var(--muted);margin-top:2px;">{{ day.notes }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card" style="text-align:center;color:var(--muted);padding:30px;">No days added to this plan.</div>
+{% endif %}
+
+<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+  <form method="post" action="{{ url_for('plans.delete', plan_id=plan.id) }}"
+        onsubmit="return confirm('Delete this plan?')">
+    <button type="submit" class="btn btn-danger btn-sm">Delete Plan</button>
+  </form>
+</div>
+{% endblock %}

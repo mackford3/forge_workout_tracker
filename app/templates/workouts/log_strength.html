@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% block title %}Log Strength{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="{{ url_for('workouts.history') }}" class="btn btn-secondary btn-sm">← Cancel</a>
+  <h1 style="font-size:28px;margin:0;">💪 STRENGTH</h1>
+</div>
+
+<form method="post" id="strength-form">
+
+  <!-- Session info -->
+  <div class="card" style="margin-bottom:10px;">
+    <div class="form-group">
+      <label class="form-label">Session Name</label>
+      <input class="form-control" name="name" placeholder="e.g. Lower, Push Day..." required/>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <select class="form-control" name="location">
+          <option value="gym">🏋️ Gym</option>
+          <option value="home">🏠 Home</option>
+          <option value="outdoor">🌳 Outdoor</option>
+          <option value="other">📍 Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date & Time</label>
+        <input class="form-control" type="datetime-local" name="completed_at"/>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">Duration (min)</label>
+        <input class="form-control" type="number" name="duration_minutes" placeholder="45"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Calories</label>
+        <input class="form-control" type="number" name="calories" placeholder="400"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Avg BPM</label>
+        <input class="form-control" type="number" name="avg_bpm" placeholder="145"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unit selector -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <h2 style="font-size:18px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:0;">EXERCISES</h2>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <span style="font-size:12px;color:var(--muted);">Unit:</span>
+      <select id="global-unit" class="form-control" style="width:auto;padding:6px 10px;font-size:13px;" onchange="setGlobalUnit(this.value)">
+        <option value="lbs" {{ 'selected' if weight_unit=='lbs' }}>lbs</option>
+        <option value="kg"  {{ 'selected' if weight_unit=='kg' }}>kg</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Exercise blocks injected here -->
+  <div id="exercises-container"></div>
+
+  <!-- Add Exercise button -->
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;border-style:dashed;"
+    onclick="addExercise()">
+    + Add Exercise
+  </button>
+
+  <!-- Save -->
+  <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;">
+    Save Workout ✓
+  </button>
+</form>
+
+<!-- Hidden set index counter (global across all exercises) -->
+<input type="hidden" id="global-set-index" value="0"/>
+
+<script>
+  // Exercise list for the select dropdowns
+  const exercises = [
+    {% for ex in exercises %}
+    { id: {{ ex.id }}, name: "{{ ex.name }}", group: "{{ ex.muscle_group or '' }}" },
+    {% endfor %}
+  ];
+
+  let globalSetIndex = 0;
+  let exerciseCount  = 0;
+
+  function buildExerciseOptions(selectedId) {
+    let opts = '<option value="">Select exercise...</option>';
+    exercises.forEach(ex => {
+      const sel = ex.id == selectedId ? 'selected' : '';
+      opts += `<option value="${ex.id}" ${sel}>${ex.name}${ex.group ? ' ('+ex.group+')' : ''}</option>`;
+    });
+    return opts;
+  }
+
+  function addExercise(selectedExerciseId = '') {
+    const exIdx = exerciseCount++;
+    const unit  = document.getElementById('global-unit').value;
+
+    const block = document.createElement('div');
+    block.className = 'exercise-block card';
+    block.dataset.exIdx = exIdx;
+    block.style.cssText = 'margin-bottom:10px;position:relative;';
+
+    block.innerHTML = `
+      <button type="button" onclick="this.closest('.exercise-block').remove()"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;z-index:1;">✕</button>
+
+      <div class="form-group" style="margin-bottom:12px;padding-right:28px;">
+        <label class="form-label">Exercise</label>
+        <select class="form-control exercise-select" onchange="persistExercise(this, ${exIdx})" required>
+          ${buildExerciseOptions(selectedExerciseId)}
+        </select>
+      </div>
+
+      <div class="sets-row" id="sets-row-${exIdx}" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;align-items:flex-end;">
+        <!-- sets appended here horizontally -->
+      </div>
+
+      <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;font-size:13px;"
+        onclick="addSet(${exIdx})">
+        + Add Set
+      </button>
+    `;
+
+    document.getElementById('exercises-container').appendChild(block);
+
+    // Auto-add first set
+    addSet(exIdx);
+  }
+
+  function addSet(exIdx) {
+    const idx   = globalSetIndex++;
+    const unit  = document.getElementById('global-unit').value;
+    const row   = document.getElementById(`sets-row-${exIdx}`);
+
+    // Count existing non-removed sets in this block to determine set number
+    const setNum = row.children.length + 1;
+
+    const card = document.createElement('div');
+    card.className = 'set-card';
+    card.style.cssText = `
+      background:var(--surface2);
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:10px;
+      min-width:110px;
+      flex-shrink:0;
+      position:relative;
+    `;
+
+    card.innerHTML = `
+      <button type="button" onclick="this.closest('.set-card').remove()"
+        style="position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;">✕</button>
+
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">
+        Set ${setNum}
+      </div>
+
+      <input type="hidden" name="sets[${idx}][set_number]" value="${setNum}"/>
+
+      <div style="margin-bottom:6px;">
+        <label class="form-label" style="font-size:10px;">Weight</label>
+        <input class="form-control" type="number" step="0.5" min="0"
+          name="sets[${idx}][weight]" placeholder="0"
+          style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;"/>
+      </div>
+
+      <div style="margin-bottom:6px;">
+        <select class="form-control unit-select" name="sets[${idx}][unit]"
+          style="padding:4px 6px;font-size:12px;">
+          <option value="lbs" ${unit=='lbs'?'selected':''}>lbs</option>
+          <option value="kg"  ${unit=='kg' ?'selected':''}>kg</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:6px;">
+        <label class="form-label" style="font-size:10px;">Reps</label>
+        <input class="form-control" type="number" min="0"
+          name="sets[${idx}][reps]" placeholder="0"
+          style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;color:var(--accent);"/>
+      </div>
+
+      <div>
+        <label class="form-label" style="font-size:10px;">RPE</label>
+        <input class="form-control" type="number" step="0.5" min="1" max="10"
+          name="sets[${idx}][rpe]" placeholder="—"
+          style="text-align:center;padding:6px 4px;font-size:13px;"/>
+      </div>
+
+      <!-- hidden: links this set to the exercise select in this block -->
+      <input type="hidden" class="set-exercise-ref" data-ex-idx="${exIdx}"
+        name="sets[${idx}][exercise_id]" value=""/>
+    `;
+
+    row.appendChild(card);
+
+    // Wire up exercise select → hidden exercise_id on all sets in block
+    syncExerciseToSets(exIdx);
+
+    // Focus the weight field of the new set
+    card.querySelector('input[type="number"]').focus();
+  }
+
+  function syncExerciseToSets(exIdx) {
+    const block  = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
+    if (!block) return;
+    const select = block.querySelector('.exercise-select');
+    const refs   = block.querySelectorAll('.set-exercise-ref');
+    refs.forEach(r => r.value = select.value);
+  }
+
+  function persistExercise(selectEl, exIdx) {
+    // When exercise changes, update all hidden exercise_id fields in this block
+    syncExerciseToSets(exIdx);
+  }
+
+  function setGlobalUnit(unit) {
+    document.querySelectorAll('.unit-select').forEach(s => s.value = unit);
+  }
+
+  // Start with one exercise block
+  addExercise();
+</script>
+{% endblock %}

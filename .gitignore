@@ -3,6 +3,18 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+
+#folders 
+config/
+app/config/
+app/static/img/
+app/static/video/
+
+#files
+requirements.txt
+.DS_Store
+
+
 # C extensions
 *.so
 

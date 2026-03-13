@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <title>{% block title %}FORGE{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:        #0a0a0a;
+      --surface:   #111111;
+      --surface2:  #1a1a1a;
+      --border:    #2a2a2a;
+      --accent:    #e8ff00;
+      --accent2:   #ff4d00;
+      --text:      #f0f0f0;
+      --muted:     #666;
+      --strength:  #e8ff00;
+      --run:       #00e5ff;
+      --hyrox:     #ff4d00;
+      --circuit:   #b44dff;
+      --amrap:     #ff006e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      min-height: 100vh;
+      padding-bottom: 80px; /* nav clearance */
+    }
+
+    /* ── Typography ── */
+    h1, h2, h3, .display { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; }
+    code, .mono { font-family: 'DM Mono', monospace; }
+
+    /* ── Layout ── */
+    .container { max-width: 640px; margin: 0 auto; padding: 0 16px; }
+
+    /* ── Top Bar ── */
+    .topbar {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,10,10,0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .topbar .logo span { color: var(--text); }
+
+    /* ── Bottom Nav ── */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(17,17,17,0.97);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .bottom-nav a {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 10px 4px;
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      transition: color 0.15s;
+      gap: 4px;
+    }
+    .bottom-nav a.active, .bottom-nav a:hover { color: var(--accent); }
+    .bottom-nav a svg { width: 22px; height: 22px; stroke-width: 1.5; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 12px;
+    }
+    .card-sm { padding: 14px 16px; }
+
+    /* ── Stat Grid ── */
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-grid.four { grid-template-columns: repeat(2, 1fr); }
+    .stat-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 14px;
+    }
+    .stat-box .stat-val {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 32px;
+      line-height: 1;
+      color: var(--accent);
+    }
+    .stat-box .stat-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ── Type Badge ── */
+    .badge {
+      display: inline-block;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .badge-strength { background: color-mix(in srgb, var(--strength) 15%, transparent); color: var(--strength); border: 1px solid color-mix(in srgb, var(--strength) 30%, transparent); }
+    .badge-run      { background: color-mix(in srgb, var(--run) 15%, transparent); color: var(--run); border: 1px solid color-mix(in srgb, var(--run) 30%, transparent); }
+    .badge-hyrox    { background: color-mix(in srgb, var(--hyrox) 15%, transparent); color: var(--hyrox); border: 1px solid color-mix(in srgb, var(--hyrox) 30%, transparent); }
+    .badge-circuit  { background: color-mix(in srgb, var(--circuit) 15%, transparent); color: var(--circuit); border: 1px solid color-mix(in srgb, var(--circuit) 30%, transparent); }
+    .badge-amrap    { background: color-mix(in srgb, var(--amrap) 15%, transparent); color: var(--amrap); border: 1px solid color-mix(in srgb, var(--amrap) 30%, transparent); }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { background: #d4eb00; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-danger { background: transparent; color: #ff4444; border: 1px solid #ff4444; }
+    .btn-danger:hover { background: #ff4444; color: #fff; }
+    .btn-full { width: 100%; }
+    .btn-sm { padding: 8px 14px; font-size: 13px; }
+
+    /* ── Forms ── */
+    .form-group { margin-bottom: 16px; }
+    .form-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .form-control {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 14px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    .form-control:focus { outline: none; border-color: var(--accent); }
+    .form-control::placeholder { color: var(--muted); }
+    select.form-control { cursor: pointer; }
+
+    /* ── Set Table ── */
+    .set-table { width: 100%; border-collapse: collapse; }
+    .set-table th {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted);
+      padding: 8px 6px; text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .set-table td { padding: 6px; vertical-align: middle; }
+    .set-table tr:not(:last-child) td { border-bottom: 1px solid var(--border); }
+    .set-table input, .set-table select {
+      width: 100%; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 8px; color: var(--text);
+      font-size: 14px; font-family: 'DM Mono', monospace;
+    }
+    .set-table input:focus, .set-table select:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Section Header ── */
+    .section-header {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: 14px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-header h2 { font-size: 22px; }
+
+    /* ── Page Header ── */
+    .page-header { padding: 20px 0 16px; }
+    .page-header h1 { font-size: 38px; line-height: 1; }
+    .page-header p { color: var(--muted); margin-top: 4px; font-size: 14px; }
+
+    /* ── Workout Row ── */
+    .workout-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color 0.15s;
+    }
+    .workout-row:hover { border-color: var(--accent); }
+    .workout-row .wr-info { flex: 1; min-width: 0; }
+    .workout-row .wr-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .workout-row .wr-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .workout-row .wr-chevron { color: var(--muted); }
+
+    /* ── Pill tabs ── */
+    .pill-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .pill {
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 13px; font-weight: 500;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); text-decoration: none; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pill.active, .pill:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+
+    /* ── Log action grid ── */
+    .log-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .log-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 16px;
+      text-decoration: none;
+      color: var(--text);
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .log-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .log-card .lc-icon { font-size: 28px; }
+    .log-card .lc-label {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px; letter-spacing: 0.05em;
+    }
+    .log-card .lc-sub { font-size: 11px; color: var(--muted); }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+    /* ── HTMX loading ── */
+    .htmx-indicator { display: none; }
+    .htmx-request .htmx-indicator { display: inline; }
+
+    /* ── Responsive ── */
+    @media (max-width: 360px) {
+      .stat-box .stat-val { font-size: 26px; }
+      .log-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <a href="{{ url_for('main.index') }}" class="logo">FOR<span>GE</span></a>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <a href="{{ url_for('exercises.index') }}" class="btn btn-secondary btn-sm">Exercises</a>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top:20px;">
+    {% block content %}{% endblock %}
+  </main>
+
+  <nav class="bottom-nav">
+    <a href="{{ url_for('main.index') }}" class="{{ 'active' if request.endpoint == 'main.index' }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Home
+    </a>
+    <a href="{{ url_for('workouts.history') }}" class="{{ 'active' if 'workouts' in (request.endpoint or '') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      History
+    </a>
+    <a href="{{ url_for('workouts.history') }}?log=1" id="log-btn"
+       onclick="document.getElementById('log-modal').style.display='flex'; return false;"
+       style="color:var(--bg);">
+      <div style="background:var(--accent);border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center;margin-top:-16px;border:3px solid var(--bg);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;stroke:var(--bg);stroke-width:2.5;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </div>
+      Log
+    </a>
+    <a href="{{ url_for('plans.index') }}" class="{{ 'active' if 'plans' in (request.endpoint or '') }}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Plans
+    </a>
+    <a href="#" onclick="toggleWeightUnit(); return false;" id="unit-toggle-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      <span id="unit-label">{{ weight_unit.upper() }}</span>
+    </a>
+  </nav>
+
+  <!-- Log Modal -->
+  <div id="log-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center;"
+       onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:var(--surface);border-radius:16px 16px 0 0;padding:24px 16px 40px;width:100%;max-width:640px;border-top:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="font-size:28px;">Log Workout</h2>
+        <button onclick="document.getElementById('log-modal').style.display='none'" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;">✕</button>
+      </div>
+      <div class="log-grid">
+        <a href="{{ url_for('workouts.log_strength') }}" class="log-card" style="border-color:color-mix(in srgb, var(--strength) 30%, transparent)">
+          <div class="lc-icon">🏋️</div>
+          <div class="lc-label" style="color:var(--strength)">Strength</div>
+          <div class="lc-sub">Sets · Reps · Weight</div>
+        </a>
+        <a href="{{ url_for('workouts.log_run') }}" class="log-card" style="border-color:color-mix(in srgb, var(--run) 30%, transparent)">
+          <div class="lc-icon">🏃</div>
+          <div class="lc-label" style="color:var(--run)">Run</div>
+          <div class="lc-sub">Distance · Time · Intervals</div>
+        </a>
+        <a href="{{ url_for('workouts.log_hyrox') }}" class="log-card" style="border-color:color-mix(in srgb, var(--hyrox) 30%, transparent)">
+          <div class="lc-icon">🔥</div>
+          <div class="lc-label" style="color:var(--hyrox)">Hyrox</div>
+          <div class="lc-sub">Race · Stations · Time</div>
+        </a>
+        <a href="{{ url_for('workouts.log_circuit') }}?type=circuit" class="log-card" style="border-color:color-mix(in srgb, var(--circuit) 30%, transparent)">
+          <div class="lc-icon">🔄</div>
+          <div class="lc-label" style="color:var(--circuit)">Circuit</div>
+          <div class="lc-sub">Rounds · Exercises</div>
+        </a>
+        <a href="{{ url_for('workouts.log_circuit') }}?type=amrap" class="log-card" style="grid-column:span 2;border-color:color-mix(in srgb, var(--amrap) 30%, transparent)">
+          <div class="lc-icon">⚡</div>
+          <div class="lc-label" style="color:var(--amrap)">AMRAP</div>
+          <div class="lc-sub">As Many Rounds As Possible</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Weight unit toggle (stored in localStorage, reloads with param)
+    function toggleWeightUnit() {
+      const current = document.getElementById('unit-label').textContent.trim();
+      const newUnit = current === 'KG' ? 'lbs' : 'kg';
+      fetch('/set-unit/' + newUnit).then(() => location.reload());
+    }
+
+    // Auto-dismiss flash messages
+    setTimeout(() => {
+      document.querySelectorAll('.flash').forEach(el => el.remove());
+    }, 3000);
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

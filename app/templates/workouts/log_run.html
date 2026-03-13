@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block title %}Log Run{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="{{ url_for('workouts.history') }}" class="btn btn-secondary btn-sm">← Cancel</a>
+  <div>
+    <h1 style="font-size:28px;margin:0;">🏃 RUN</h1>
+    <p style="color:var(--muted);font-size:13px;margin:2px 0 0;">Log distance, time or intervals</p>
+  </div>
+</div>
+
+<form method="post">
+  <div class="card">
+    <div class="form-group">
+      <label class="form-label">Session Name</label>
+      <input class="form-control" name="name" placeholder="e.g. Morning Run, Intervals..." required/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Run Type</label>
+      <select class="form-control" name="run_type" id="run-type" onchange="updateRunType(this.value)">
+        <option value="continuous">Continuous (e.g. 7 miles straight)</option>
+        <option value="interval">Interval (e.g. 0.25mi × 8)</option>
+        <option value="timed">Timed (run for X minutes)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Date & Time</label>
+      <input class="form-control" type="datetime-local" name="completed_at"/>
+    </div>
+  </div>
+
+  <!-- Continuous / Timed fields -->
+  <div class="card" id="overall-fields">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group" id="distance-field">
+        <label class="form-label">Distance (km)</label>
+        <input class="form-control" type="number" step="0.001" min="0" name="total_distance_km" placeholder="0.000"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Total Time (MM:SS)</label>
+        <input class="form-control" name="total_duration" placeholder="45:00"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Avg Heart Rate (bpm)</label>
+      <input class="form-control" type="number" name="avg_heart_rate" placeholder="Optional"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Route / Notes</label>
+      <textarea class="form-control" name="route_notes" rows="2" placeholder="Where did you run?"></textarea>
+    </div>
+  </div>
+
+  <!-- Intervals -->
+  <div id="interval-section" style="display:none;">
+    <div class="section-header">
+      <h2>INTERVALS</h2>
+    </div>
+    <div id="intervals-container"></div>
+    <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;"
+      hx-get="{{ url_for('workouts.htmx_interval_row') }}"
+      hx-target="#intervals-container"
+      hx-swap="beforeend"
+      hx-on::after-request="incInterval()"
+      id="add-interval-btn">
+      + Add Interval
+    </button>
+    <input type="hidden" id="interval-index" value="0"/>
+  </div>
+
+  <div class="form-group">
+    <label class="form-label">Session Notes</label>
+    <textarea class="form-control" name="notes" rows="2" placeholder="How did it feel?"></textarea>
+  </div>
+
+  <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;">
+    Save Run ✓
+  </button>
+</form>
+
+<script>
+  let iIdx = 0;
+
+  function updateRunType(val) {
+    const distField = document.getElementById('distance-field');
+    const intervalSection = document.getElementById('interval-section');
+    if (val === 'interval') {
+      intervalSection.style.display = 'block';
+      distField.style.opacity = '0.4';
+    } else if (val === 'timed') {
+      intervalSection.style.display = 'none';
+      distField.style.opacity = '0.4';
+    } else {
+      intervalSection.style.display = 'none';
+      distField.style.opacity = '1';
+    }
+  }
+
+  function incInterval() {
+    iIdx++;
+    const btn = document.getElementById('add-interval-btn');
+    btn.setAttribute('hx-get', `{{ url_for('workouts.htmx_interval_row') }}?index=${iIdx}`);
+    htmx.process(btn);
+  }
+
+  function removeRow(btn) { btn.closest('.set-row').remove(); }
+</script>
+{% endblock %}

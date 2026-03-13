@@ -1,0 +1,209 @@
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime
+
+db = SQLAlchemy()
+
+
+class WorkoutPlan(db.Model):
+    __tablename__ = 'workout_plans'
+    id          = db.Column(db.Integer, primary_key=True)
+    name        = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    is_active   = db.Column(db.Boolean, default=False)
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    days        = db.relationship('PlanDay', backref='plan', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class PlanDay(db.Model):
+    __tablename__ = 'plan_days'
+    id          = db.Column(db.Integer, primary_key=True)
+    plan_id     = db.Column(db.Integer, db.ForeignKey('workout_plans.id'), nullable=False)
+    week_number = db.Column(db.Integer, default=1)
+    day_of_week = db.Column(db.String(10), nullable=False)
+    name        = db.Column(db.String(100))
+    notes       = db.Column(db.Text)
+    order_index = db.Column(db.Integer, default=0)
+    workouts    = db.relationship('Workout', backref='plan_day', lazy='dynamic')
+
+
+class Exercise(db.Model):
+    __tablename__ = 'exercises'
+    id           = db.Column(db.Integer, primary_key=True)
+    name         = db.Column(db.String(100), nullable=False, unique=True)
+    muscle_group = db.Column(db.String(50))
+    category     = db.Column(db.String(50), default='strength')
+    created_at   = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Workout(db.Model):
+    __tablename__ = 'workouts'
+    id               = db.Column(db.Integer, primary_key=True)
+    plan_day_id      = db.Column(db.Integer, db.ForeignKey('plan_days.id'), nullable=True)
+    workout_type     = db.Column(db.String(20), nullable=False)
+    name             = db.Column(db.String(100), nullable=False)
+    location         = db.Column(db.String(20), default='gym')
+    time_of_day      = db.Column(db.Time)
+    duration_minutes = db.Column(db.Integer)
+    calories         = db.Column(db.Integer)
+    avg_bpm          = db.Column(db.Integer)
+    notes            = db.Column(db.Text)
+    completed_at     = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at       = db.Column(db.DateTime, default=datetime.utcnow)
+
+    sets        = db.relationship('WorkoutSet',  backref='workout', lazy='dynamic', cascade='all, delete-orphan')
+    cardio_sets = db.relationship('CardioSet',   backref='workout', lazy='dynamic', cascade='all, delete-orphan')
+    runs        = db.relationship('Run',         backref='workout', lazy='dynamic', cascade='all, delete-orphan')
+    hyrox       = db.relationship('HyroxResult', backref='workout', lazy='dynamic', cascade='all, delete-orphan')
+    circuits    = db.relationship('Circuit',     backref='workout', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class WorkoutSet(db.Model):
+    __tablename__ = 'workout_sets'
+    id            = db.Column(db.Integer, primary_key=True)
+    workout_id    = db.Column(db.Integer, db.ForeignKey('workouts.id'), nullable=False)
+    exercise_id   = db.Column(db.Integer, db.ForeignKey('exercises.id'), nullable=False)
+    set_number    = db.Column(db.Integer, nullable=False)
+    weight_kg     = db.Column(db.Numeric(6, 2))
+    weight_lbs    = db.Column(db.Numeric(6, 2))
+    reps          = db.Column(db.Integer)
+    steps         = db.Column(db.Integer)
+    distance_m    = db.Column(db.Numeric(7, 1))
+    assist_weight = db.Column(db.Numeric(6, 2))
+    is_assisted   = db.Column(db.Boolean, default=False)
+    rpe           = db.Column(db.Numeric(3, 1))
+    skipped       = db.Column(db.Boolean, default=False)
+    notes         = db.Column(db.Text)
+    exercise      = db.relationship('Exercise')
+
+
+class CardioSet(db.Model):
+    __tablename__ = 'cardio_sets'
+    id           = db.Column(db.Integer, primary_key=True)
+    workout_id   = db.Column(db.Integer, db.ForeignKey('workouts.id'), nullable=False)
+    machine      = db.Column(db.String(30), nullable=False)
+    set_number   = db.Column(db.Integer, default=1)
+    distance_m   = db.Column(db.Integer)
+    duration_s   = db.Column(db.Integer)
+    pace_split_s = db.Column(db.Integer)
+    calories     = db.Column(db.Integer)
+    avg_bpm      = db.Column(db.Integer)
+    damper       = db.Column(db.Integer)
+    notes        = db.Column(db.Text)
+
+
+class Run(db.Model):
+    __tablename__ = 'runs'
+    id                = db.Column(db.Integer, primary_key=True)
+    workout_id        = db.Column(db.Integer, db.ForeignKey('workouts.id'), nullable=False)
+    run_type          = db.Column(db.String(20), default='continuous')
+    total_distance_km = db.Column(db.Numeric(7, 3))
+    total_duration_s  = db.Column(db.Integer)
+    avg_heart_rate    = db.Column(db.Integer)
+    avg_pace_s        = db.Column(db.Integer)
+    route_notes       = db.Column(db.Text)
+    segments          = db.relationship('RunSegment', backref='run', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class RunSegment(db.Model):
+    __tablename__ = 'run_segments'
+    id             = db.Column(db.Integer, primary_key=True)
+    run_id         = db.Column(db.Integer, db.ForeignKey('runs.id'), nullable=False)
+    segment_type   = db.Column(db.String(20), nullable=False)
+    segment_number = db.Column(db.Integer, nullable=False)
+    distance_km    = db.Column(db.Numeric(6, 4))
+    duration_s     = db.Column(db.Integer)
+    pace_per_km_s  = db.Column(db.Integer)
+    avg_bpm        = db.Column(db.Integer)
+    skipped        = db.Column(db.Boolean, default=False)
+    notes          = db.Column(db.Text)
+
+
+class HyroxResult(db.Model):
+    __tablename__ = 'hyrox_results'
+    id             = db.Column(db.Integer, primary_key=True)
+    workout_id     = db.Column(db.Integer, db.ForeignKey('workouts.id'), nullable=False)
+    total_time_s   = db.Column(db.Integer)
+    running_time_s = db.Column(db.Integer)
+    workout_time_s = db.Column(db.Integer)
+    location       = db.Column(db.String(100))
+    race_type      = db.Column(db.String(20), default='singles')
+    notes          = db.Column(db.Text)
+    stations       = db.relationship('HyroxStation', backref='result', lazy='dynamic', cascade='all, delete-orphan')
+
+
+HYROX_DEFAULT_STATIONS = [
+    ("1km Run",           1,  None, None),
+    ("SkiErg",            2,  1000, None),
+    ("1km Run",           3,  None, None),
+    ("Sled Push",         4,  50,   None),
+    ("1km Run",           5,  None, None),
+    ("Sled Pull",         6,  50,   None),
+    ("1km Run",           7,  None, None),
+    ("Burpee Broad Jump", 8,  80,   None),
+    ("1km Run",           9,  None, None),
+    ("Row",               10, 1000, None),
+    ("1km Run",           11, None, None),
+    ("Farmers Carry",     12, 200,  None),
+    ("1km Run",           13, None, None),
+    ("Sandbag Lunges",    14, 100,  None),
+    ("1km Run",           15, None, None),
+    ("Wall Balls",        16, None, 100),
+]
+
+
+class HyroxStation(db.Model):
+    __tablename__ = 'hyrox_stations'
+    id              = db.Column(db.Integer, primary_key=True)
+    hyrox_result_id = db.Column(db.Integer, db.ForeignKey('hyrox_results.id'), nullable=False)
+    station_order   = db.Column(db.Integer, nullable=False)
+    station_name    = db.Column(db.String(100), nullable=False)
+    time_s          = db.Column(db.Integer)
+    weight_kg       = db.Column(db.Numeric(6, 2))
+    weight_lbs      = db.Column(db.Numeric(6, 2))
+    distance_m      = db.Column(db.Integer)
+    reps            = db.Column(db.Integer)
+    notes           = db.Column(db.Text)
+
+
+class Circuit(db.Model):
+    __tablename__ = 'circuits'
+    id               = db.Column(db.Integer, primary_key=True)
+    workout_id       = db.Column(db.Integer, db.ForeignKey('workouts.id'), nullable=False)
+    circuit_type     = db.Column(db.String(10), default='circuit')
+    rounds_target    = db.Column(db.Integer)
+    rounds_completed = db.Column(db.Numeric(4, 1))
+    time_cap_s       = db.Column(db.Integer)
+    total_time_s     = db.Column(db.Integer)
+    notes            = db.Column(db.Text)
+    exercises        = db.relationship('CircuitExercise', backref='circuit', lazy='dynamic',
+                                       order_by='CircuitExercise.order_index', cascade='all, delete-orphan')
+
+
+class CircuitExercise(db.Model):
+    __tablename__ = 'circuit_exercises'
+    id                = db.Column(db.Integer, primary_key=True)
+    circuit_id        = db.Column(db.Integer, db.ForeignKey('circuits.id'), nullable=False)
+    exercise_id       = db.Column(db.Integer, db.ForeignKey('exercises.id'), nullable=False)
+    order_index       = db.Column(db.Integer, nullable=False)
+    target_reps       = db.Column(db.Integer)
+    target_weight_lbs = db.Column(db.Numeric(6, 2))
+    target_distance_m = db.Column(db.Integer)
+    notes             = db.Column(db.Text)
+    exercise          = db.relationship('Exercise')
+    round_sets        = db.relationship('CircuitRoundSet', backref='circuit_exercise',
+                                        lazy='dynamic', cascade='all, delete-orphan')
+
+
+class CircuitRoundSet(db.Model):
+    __tablename__ = 'circuit_round_sets'
+    id                  = db.Column(db.Integer, primary_key=True)
+    circuit_exercise_id = db.Column(db.Integer, db.ForeignKey('circuit_exercises.id'), nullable=False)
+    round_number        = db.Column(db.Integer, nullable=False)
+    reps                = db.Column(db.Integer)
+    weight_lbs          = db.Column(db.Numeric(6, 2))
+    weight_kg           = db.Column(db.Numeric(6, 2))
+    duration_s          = db.Column(db.Integer)
+    distance_m          = db.Column(db.Numeric(7, 1))
+    steps               = db.Column(db.Integer)
+    skipped             = db.Column(db.Boolean, default=False)
+    notes               = db.Column(db.Text)
