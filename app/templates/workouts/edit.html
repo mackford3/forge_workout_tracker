@@ -1,0 +1,394 @@
+{% extends 'base.html' %}
+{% block title %}Edit – {{ workout.name }}{% endblock %}
+
+{% block content %}
+{% set wtype = workout.workout_type %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="{{ url_for('workouts.view', workout_id=workout.id) }}" class="btn btn-secondary btn-sm">← Cancel</a>
+  <h1 style="font-size:28px;margin:0;">Edit Workout</h1>
+</div>
+
+<form method="post">
+
+  <!-- ── Session metadata ── -->
+  <div class="card" style="margin-bottom:10px;">
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-control" name="name" value="{{ workout.name }}" required/>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <select class="form-control" name="location">
+          {% for val, label in locations %}
+          <option value="{{ val }}" {{ 'selected' if workout.location == val }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date & Time</label>
+        <input class="form-control" type="datetime-local" name="completed_at"
+               value="{{ workout.completed_at.strftime('%Y-%m-%dT%H:%M') }}"/>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">Duration (min)</label>
+        <input class="form-control" type="number" name="duration_minutes"
+               value="{{ workout.duration_minutes or '' }}" placeholder="45"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Calories</label>
+        <input class="form-control" type="number" name="calories"
+               value="{{ workout.calories or '' }}" placeholder="400"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Avg BPM</label>
+        <input class="form-control" type="number" name="avg_bpm"
+               value="{{ workout.avg_bpm or '' }}" placeholder="145"/>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Notes</label>
+      <textarea class="form-control" name="notes" rows="2">{{ workout.notes or '' }}</textarea>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       STRENGTH
+  ══════════════════════════════════════════ -->
+  {% if wtype == 'strength' %}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <h2 style="font-size:20px;">SETS</h2>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <span style="font-size:12px;color:var(--muted);">Unit:</span>
+      <select id="global-unit" class="form-control" style="width:auto;padding:6px 10px;font-size:13px;"
+              onchange="document.querySelectorAll('.unit-select').forEach(s=>s.value=this.value)">
+        <option value="lbs" {{ 'selected' if weight_unit=='lbs' }}>lbs</option>
+        <option value="kg"  {{ 'selected' if weight_unit=='kg' }}>kg</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="exercises-container">
+  {% set sets = workout.sets.order_by('exercise_id','set_number').all() %}
+  {% set ex_groups = {} %}
+  {% for s in sets %}
+    {% if s.exercise.name not in ex_groups %}{% set _ = ex_groups.update({s.exercise.name: []}) %}{% endif %}
+    {% set _ = ex_groups[s.exercise.name].append(s) %}
+  {% endfor %}
+
+  {% set global_idx = namespace(v=0) %}
+  {% for ex_name, ex_sets in ex_groups.items() %}
+  <div class="exercise-block card" data-ex-idx="{{ loop.index0 }}" style="margin-bottom:10px;position:relative;">
+    <button type="button" onclick="this.closest('.exercise-block').remove()"
+      style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+
+    <div class="form-group" style="margin-bottom:12px;padding-right:28px;">
+      <label class="form-label">Exercise</label>
+      <select class="form-control exercise-select" onchange="syncExercise(this)" required>
+        {% for ex in exercises %}
+        <option value="{{ ex.id }}" {{ 'selected' if ex.name == ex_name }}>{{ ex.name }}{% if ex.muscle_group %} ({{ ex.muscle_group }}){% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="sets-row" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;align-items:flex-end;">
+    {% for s in ex_sets %}
+    {% set idx = global_idx.v %}
+    <div class="set-card" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;min-width:110px;flex-shrink:0;position:relative;">
+      <button type="button" onclick="this.closest('.set-card').remove()"
+        style="position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;">✕</button>
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">Set {{ s.set_number }}</div>
+      <input type="hidden" name="sets[{{ idx }}][set_number]" value="{{ s.set_number }}"/>
+      <input type="hidden" class="set-exercise-ref" name="sets[{{ idx }}][exercise_id]" value="{{ s.exercise_id }}"/>
+      <div style="margin-bottom:6px;">
+        <label class="form-label" style="font-size:10px;">Weight</label>
+        <input class="form-control" type="number" step="0.5" min="0"
+               name="sets[{{ idx }}][weight]"
+               value="{{ s.weight_lbs|float|int if (weight_unit=='lbs' and s.weight_lbs) else (s.weight_kg|float if s.weight_kg else '') }}"
+               style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;"/>
+      </div>
+      <div style="margin-bottom:6px;">
+        <select class="form-control unit-select" name="sets[{{ idx }}][unit]" style="padding:4px 6px;font-size:12px;">
+          <option value="lbs" {{ 'selected' if weight_unit=='lbs' }}>lbs</option>
+          <option value="kg"  {{ 'selected' if weight_unit=='kg' }}>kg</option>
+        </select>
+      </div>
+      <div style="margin-bottom:6px;">
+        <label class="form-label" style="font-size:10px;">Reps</label>
+        <input class="form-control" type="number" min="0"
+               name="sets[{{ idx }}][reps]" value="{{ s.reps or '' }}"
+               style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;color:var(--accent);"/>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:10px;">RPE</label>
+        <input class="form-control" type="number" step="0.5" min="1" max="10"
+               name="sets[{{ idx }}][rpe]" value="{{ s.rpe|float if s.rpe else '' }}"
+               style="text-align:center;padding:6px 4px;font-size:13px;"/>
+      </div>
+    </div>
+    {% set global_idx.v = global_idx.v + 1 %}
+    {% endfor %}
+    </div>
+
+    <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;font-size:13px;"
+      onclick="addSet(this, {{ loop.index0 }})">+ Add Set</button>
+  </div>
+  {% endfor %}
+  </div>
+
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;border-style:dashed;"
+    onclick="addExercise()">+ Add Exercise</button>
+
+  <input type="hidden" id="global-set-index" value="{{ workout.sets.count() }}"/>
+
+  <!-- ══════════════════════════════════════════
+       CIRCUIT / AMRAP
+  ══════════════════════════════════════════ -->
+  {% elif wtype in ('circuit', 'amrap') %}
+  {% set c = workout.circuits.first() %}
+  {% if c %}
+  <div class="card" style="margin-bottom:10px;">
+    <h2 style="font-size:18px;margin-bottom:14px;">ROUND INFO</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">Rounds Target</label>
+        <input class="form-control" type="number" name="rounds_target" value="{{ c.rounds_target or '' }}" placeholder="4"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rounds Completed</label>
+        <input class="form-control" type="number" step="0.5" name="rounds_completed" value="{{ c.rounds_completed|float if c.rounds_completed else '' }}" placeholder="4"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Time Cap (MM:SS)</label>
+        <input class="form-control" name="time_cap"
+               value="{{ '%d:%02d'|format(c.time_cap_s//60, c.time_cap_s%60) if c.time_cap_s else '' }}" placeholder="40:00"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Total Time (MM:SS)</label>
+        <input class="form-control" name="total_time"
+               value="{{ '%d:%02d'|format(c.total_time_s//60, c.total_time_s%60) if c.total_time_s else '' }}" placeholder="33:00"/>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Notes</label>
+      <textarea class="form-control" name="circuit_notes" rows="2">{{ c.notes or '' }}</textarea>
+    </div>
+  </div>
+
+  {% set rounds_n = c.rounds_completed|int if c.rounds_completed else (c.rounds_target or 4) %}
+
+  {% for ce in c.exercises.all() %}
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:14px;">
+      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">{{ loop.index }}</span>
+      <span style="font-size:15px;font-weight:600;">{{ ce.exercise.name }}</span>
+      {% if ce.target_reps %}<span style="font-size:11px;color:var(--muted);margin-left:auto;">target {{ ce.target_reps }} reps{% if ce.target_weight_lbs %} @ {{ ce.target_weight_lbs|float|int }}lbs{% endif %}</span>{% endif %}
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">
+          <th style="padding:4px 8px;text-align:left;width:50px;">Round</th>
+          {% set has_dur = ce.round_sets.filter_by(skipped=False).first() and ce.round_sets.first().duration_s %}
+          {% set has_wt  = ce.target_weight_lbs %}
+          <th style="padding:4px 8px;text-align:center;">
+            {%- if ce.round_sets.count() > 0 and ce.round_sets.first().duration_s -%}Time (MM:SS)
+            {%- elif ce.exercise.name == 'Running' or ce.exercise.name == 'Row Machine' or ce.exercise.name == 'Ski Erg' -%}Time (MM:SS)
+            {%- else -%}Reps{%- endif -%}
+          </th>
+          {% if ce.target_weight_lbs or (ce.round_sets.count() > 0 and ce.round_sets.first().weight_lbs) %}
+          <th style="padding:4px 8px;text-align:center;">Weight (lbs)</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in range(1, rounds_n + 1) %}
+      {% set rs = ce.round_sets.filter_by(round_number=r).first() %}
+      <tr style="border-top:1px solid var(--border);">
+        <td style="padding:8px;font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);">R{{ r }}</td>
+        <td style="padding:4px 8px;">
+          {% if ce.exercise.name in ('Running','Row Machine','Ski Erg') or (rs and rs.duration_s) %}
+          <input class="form-control" name="ce[{{ ce.id }}][round][{{ r }}][duration]"
+                 value="{{ '%d:%02d'|format(rs.duration_s//60, rs.duration_s%60) if rs and rs.duration_s else '' }}"
+                 placeholder="2:30" style="text-align:center;font-family:'DM Mono',monospace;"/>
+          {% else %}
+          <input class="form-control" type="number" name="ce[{{ ce.id }}][round][{{ r }}][reps]"
+                 value="{{ rs.reps if rs and rs.reps else '' }}"
+                 placeholder="—" style="text-align:center;font-family:'DM Mono',monospace;font-weight:600;color:var(--accent);"/>
+          {% endif %}
+        </td>
+        {% if ce.target_weight_lbs or (ce.round_sets.count() > 0 and ce.round_sets.first().weight_lbs) %}
+        <td style="padding:4px 8px;">
+          <input class="form-control" type="number" step="0.5"
+                 name="ce[{{ ce.id }}][round][{{ r }}][weight]"
+                 value="{{ rs.weight_lbs|float|int if rs and rs.weight_lbs else (ce.target_weight_lbs|float|int if ce.target_weight_lbs else '') }}"
+                 placeholder="{{ ce.target_weight_lbs|float|int if ce.target_weight_lbs else '—' }}"
+                 style="text-align:center;font-family:'DM Mono',monospace;"/>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- ══════════════════════════════════════════
+       RUN
+  ══════════════════════════════════════════ -->
+  {% elif wtype == 'run' %}
+  {% set run = workout.runs.first() %}
+  {% if run %}
+  <div class="card" style="margin-bottom:10px;">
+    <h2 style="font-size:18px;margin-bottom:14px;">RUN INFO</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">Total Distance (km)</label>
+        <input class="form-control" type="number" step="0.001" name="total_distance_km"
+               value="{{ run.total_distance_km|float if run.total_distance_km else '' }}" placeholder="5.0"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Total Time (MM:SS)</label>
+        <input class="form-control" name="total_duration"
+               value="{{ '%d:%02d'|format(run.total_duration_s//60, run.total_duration_s%60) if run.total_duration_s else '' }}" placeholder="25:00"/>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Route Notes</label>
+      <input class="form-control" name="route_notes" value="{{ run.route_notes or '' }}"/>
+    </div>
+  </div>
+
+  {% set segments = run.segments.order_by('segment_number').all() %}
+  {% if segments %}
+  <div class="card" style="margin-bottom:10px;">
+    <h2 style="font-size:18px;margin-bottom:14px;">SEGMENTS</h2>
+    {% for seg in segments %}
+    <div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+      <input type="hidden" name="segs[{{ loop.index0 }}][type]" value="{{ seg.segment_type }}"/>
+      <input type="hidden" name="segs[{{ loop.index0 }}][num]"  value="{{ seg.segment_number }}"/>
+      <span style="font-size:10px;font-weight:600;text-transform:uppercase;min-width:64px;
+        color:{% if seg.segment_type=='warmup' %}#ffaa00{% elif seg.segment_type=='interval' %}var(--run){% elif seg.segment_type=='cooldown' %}#888{% else %}var(--muted){% endif %};">
+        {{ seg.segment_type }}{% if seg.segment_type == 'interval' %} {{ seg.segment_number }}{% endif %}
+      </span>
+      <div style="flex:1;">
+        <input class="form-control" type="number" step="0.001"
+               name="segs[{{ loop.index0 }}][dist]"
+               value="{{ seg.distance_km|float if seg.distance_km else '' }}"
+               placeholder="km" style="padding:6px 8px;font-size:13px;"/>
+      </div>
+      <div style="flex:1;">
+        <input class="form-control"
+               name="segs[{{ loop.index0 }}][dur]"
+               value="{{ '%d:%02d'|format(seg.duration_s//60, seg.duration_s%60) if seg.duration_s else '' }}"
+               placeholder="MM:SS" style="padding:6px 8px;font-size:13px;font-family:'DM Mono',monospace;"/>
+      </div>
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);">
+        <input type="checkbox" name="segs[{{ loop.index0 }}][skipped]" value="1" {{ 'checked' if seg.skipped }}/>
+        skip
+      </label>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {% endif %}
+
+  <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;margin-top:8px;">
+    Save Changes ✓
+  </button>
+</form>
+
+{% if wtype == 'strength' %}
+<script>
+  const exercises = [
+    {% for ex in exercises %}
+    { id: {{ ex.id }}, name: "{{ ex.name }}", group: "{{ ex.muscle_group or '' }}" },
+    {% endfor %}
+  ];
+
+  let globalSetIndex = parseInt(document.getElementById('global-set-index').value);
+  let exerciseCount  = document.querySelectorAll('.exercise-block').length;
+
+  function buildExerciseOptions(selectedId) {
+    return '<option value="">Select exercise...</option>' +
+      exercises.map(ex => `<option value="${ex.id}" ${ex.id==selectedId?'selected':''}>${ex.name}${ex.group?' ('+ex.group+')':''}</option>`).join('');
+  }
+
+  function syncExercise(selectEl) {
+    const block = selectEl.closest('.exercise-block');
+    block.querySelectorAll('.set-exercise-ref').forEach(r => r.value = selectEl.value);
+  }
+
+  function addSet(btn, exIdx) {
+    const row    = btn.previousElementSibling;
+    const idx    = globalSetIndex++;
+    document.getElementById('global-set-index').value = globalSetIndex;
+    const setNum = row.children.length + 1;
+    const unit   = document.getElementById('global-unit').value;
+    const block  = btn.closest('.exercise-block');
+    const exId   = block.querySelector('.exercise-select').value;
+
+    const card = document.createElement('div');
+    card.className = 'set-card';
+    card.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;min-width:110px;flex-shrink:0;position:relative;';
+    card.innerHTML = `
+      <button type="button" onclick="this.closest('.set-card').remove()"
+        style="position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;">✕</button>
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">Set ${setNum}</div>
+      <input type="hidden" name="sets[${idx}][set_number]" value="${setNum}"/>
+      <input type="hidden" class="set-exercise-ref" name="sets[${idx}][exercise_id]" value="${exId}"/>
+      <div style="margin-bottom:6px;">
+        <label class="form-label" style="font-size:10px;">Weight</label>
+        <input class="form-control" type="number" step="0.5" min="0" name="sets[${idx}][weight]" placeholder="0"
+               style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;"/>
+      </div>
+      <div style="margin-bottom:6px;">
+        <select class="form-control unit-select" name="sets[${idx}][unit]" style="padding:4px 6px;font-size:12px;">
+          <option value="lbs" ${unit=='lbs'?'selected':''}>lbs</option>
+          <option value="kg"  ${unit=='kg' ?'selected':''}>kg</option>
+        </select>
+      </div>
+      <div style="margin-bottom:6px;">
+        <label class="form-label" style="font-size:10px;">Reps</label>
+        <input class="form-control" type="number" min="0" name="sets[${idx}][reps]" placeholder="0"
+               style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;color:var(--accent);"/>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:10px;">RPE</label>
+        <input class="form-control" type="number" step="0.5" min="1" max="10" name="sets[${idx}][rpe]" placeholder="—"
+               style="text-align:center;padding:6px 4px;font-size:13px;"/>
+      </div>`;
+    row.appendChild(card);
+  }
+
+  function addExercise() {
+    const exIdx = exerciseCount++;
+    const unit  = document.getElementById('global-unit').value;
+    const block = document.createElement('div');
+    block.className = 'exercise-block card';
+    block.dataset.exIdx = exIdx;
+    block.style.cssText = 'margin-bottom:10px;position:relative;';
+    block.innerHTML = `
+      <button type="button" onclick="this.closest('.exercise-block').remove()"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+      <div class="form-group" style="margin-bottom:12px;padding-right:28px;">
+        <label class="form-label">Exercise</label>
+        <select class="form-control exercise-select" onchange="syncExercise(this)" required>
+          ${buildExerciseOptions('')}
+        </select>
+      </div>
+      <div class="sets-row" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;align-items:flex-end;"></div>
+      <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;font-size:13px;"
+        onclick="addSet(this, ${exIdx})">+ Add Set</button>`;
+    document.getElementById('exercises-container').appendChild(block);
+    addSet(block.querySelector('.btn'), exIdx);
+  }
+</script>
+{% endif %}
+{% endblock %}

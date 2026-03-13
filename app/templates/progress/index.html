@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% block title %}Progress{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>📈 PROGRESS</h1>
+  <p>Track weight over time per exercise</p>
+</div>
+
+<div class="card" style="margin-bottom:12px;">
+  <div class="form-group" style="margin-bottom:0;">
+    <label class="form-label">Select Exercise</label>
+    <select id="exercise-select" class="form-control" onchange="loadChart(this.value)">
+      <option value="">Choose an exercise...</option>
+      {% set current_group = namespace(v='') %}
+      {% for ex in exercises %}
+        {% if ex.muscle_group != current_group.v %}
+          {% if current_group.v %}</optgroup>{% endif %}
+          <optgroup label="{{ ex.muscle_group or 'Other' }}">
+          {% set current_group.v = ex.muscle_group %}
+        {% endif %}
+        <option value="{{ ex.id }}">{{ ex.name }}</option>
+      {% endfor %}
+      {% if current_group.v %}</optgroup>{% endif %}
+    </select>
+  </div>
+</div>
+
+<!-- Chart area -->
+<div id="chart-container" style="display:none;">
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;">
+      <div id="chart-title" style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent);"></div>
+      <div id="chart-pr" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);"></div>
+    </div>
+    <canvas id="progress-chart" style="width:100%;max-height:260px;"></canvas>
+  </div>
+
+  <!-- Session breakdown -->
+  <div id="session-list"></div>
+</div>
+
+<div id="empty-state" style="display:none;" class="card">
+  <div style="text-align:center;padding:20px 0;color:var(--muted);">No weight data found for this exercise.</div>
+</div>
+
+<div id="loading" style="display:none;text-align:center;padding:40px;color:var(--muted);">Loading...</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+let chartInstance = null;
+
+async function loadChart(exerciseId) {
+  if (!exerciseId) return;
+
+  document.getElementById('chart-container').style.display = 'none';
+  document.getElementById('empty-state').style.display     = 'none';
+  document.getElementById('loading').style.display         = 'block';
+
+  const res  = await fetch(`/progress/data?exercise_id=${exerciseId}`);
+  const data = await res.json();
+
+  document.getElementById('loading').style.display = 'none';
+
+  if (!data.length) {
+    document.getElementById('empty-state').style.display = 'block';
+    return;
+  }
+
+  const unit    = '{{ weight_unit }}';
+  const labels  = data.map(d => {
+    const dt = new Date(d.date);
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  });
+  const weights = data.map(d => unit === 'lbs' ? d.max_lbs : d.max_kg);
+  const maxW    = Math.max(...weights);
+  const exName  = document.getElementById('exercise-select').selectedOptions[0].text;
+
+  document.getElementById('chart-title').textContent = exName;
+  document.getElementById('chart-pr').textContent    = `PR: ${maxW} ${unit}`;
+  document.getElementById('chart-container').style.display = 'block';
+
+  if (chartInstance) chartInstance.destroy();
+
+  const ctx = document.getElementById('progress-chart').getContext('2d');
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: `Max weight (${unit})`,
+        data: weights,
+        borderColor: '#e8ff00',
+        backgroundColor: 'rgba(232,255,0,0.08)',
+        pointBackgroundColor: data.map(d => {
+          const w = unit === 'lbs' ? d.max_lbs : d.max_kg;
+          return w === maxW ? '#ff4d00' : '#e8ff00';
+        }),
+        pointRadius: data.map(d => {
+          const w = unit === 'lbs' ? d.max_lbs : d.max_kg;
+          return w === maxW ? 7 : 5;
+        }),
+        tension: 0.3,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const d = data[ctx.dataIndex];
+              const w = unit === 'lbs' ? d.max_lbs : d.max_kg;
+              return ` ${w} ${unit} — ${d.workout_name}`;
+            },
+            afterLabel: (ctx) => {
+              const d = data[ctx.dataIndex];
+              return d.sets.map(s => `  Set ${s.set}: ${s.lbs}lbs × ${s.reps || '?'}`);
+            }
+          },
+          backgroundColor: '#1a1a1a',
+          borderColor: '#2a2a2a',
+          borderWidth: 1,
+          titleColor: '#e8ff00',
+          bodyColor: '#f0f0f0',
+          padding: 12,
+        }
+      },
+      scales: {
+        x: {
+          grid:   { color: '#1a1a1a' },
+          ticks:  { color: '#666', font: { family: 'DM Mono', size: 11 } }
+        },
+        y: {
+          grid:   { color: '#1a1a1a' },
+          ticks:  { color: '#666', font: { family: 'DM Mono', size: 11 },
+                    callback: v => `${v} ${unit}` }
+        }
+      }
+    }
+  });
+
+  // Session list
+  const list = document.getElementById('session-list');
+  list.innerHTML = '';
+  [...data].reverse().forEach(d => {
+    const w = unit === 'lbs' ? d.max_lbs : d.max_kg;
+    const isPR = w === maxW;
+    const dt = new Date(d.date);
+    const dateStr = dt.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+    const setsHtml = d.sets.map(s =>
+      `<span style="font-family:'DM Mono',monospace;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;">${s.lbs}${unit} × ${s.reps || '?'}</span>`
+    ).join(' ');
+
+    list.innerHTML += `
+      <a href="/workouts/${d.workout_id}" style="display:block;text-decoration:none;color:var(--text);">
+        <div class="card card-sm" style="margin-bottom:8px;${isPR ? 'border-color:#ff4d00;' : ''}">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="font-size:13px;color:var(--muted);">${dateStr}</span>
+            ${isPR ? '<span style="font-family:\'DM Mono\',monospace;font-size:10px;background:#ff4d00;color:#fff;padding:2px 6px;border-radius:4px;">PR</span>' : ''}
+            <span style="margin-left:auto;font-family:\'DM Mono\',monospace;font-size:16px;font-weight:700;color:var(--accent);">${w} ${unit}</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;">${setsHtml}</div>
+        </div>
+      </a>`;
+  });
+}
+</script>
+{% endblock %}
