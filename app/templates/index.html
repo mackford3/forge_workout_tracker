@@ -36,6 +36,24 @@
   </div>
 </div>
 
+<!-- Streak row -->
+
+<div class="card card-sm" style="margin-bottom:10px;display:flex;align-items:center;gap:0;">
+  <div style="flex:1;text-align:center;padding:4px 0;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;
+      color:{% if current_streak >= 7 %}#ff4d00{% elif current_streak >= 3 %}var(--accent){% else %}var(--text){% endif %};">
+      {{ current_streak }}{{ '🔥' if current_streak >= 3 else '' }}
+    </div>
+    <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-top:2px;">Current Streak</div>
+  </div>
+  <div style="width:1px;background:var(--border);height:40px;"></div>
+  <div style="flex:1;text-align:center;padding:4px 0;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;color:var(--muted);">
+      {{ longest_streak }}
+    </div>
+    <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-top:2px;">Best Streak</div>
+  </div>
+</div>
 <!-- Calories row -->
 {% if ytd_calories %}
 <div class="card card-sm" style="margin-bottom:10px;display:flex;align-items:center;gap:14px;">

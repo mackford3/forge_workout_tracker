@@ -187,12 +187,12 @@ All tables live in the `forge` schema inside the `forge_workouts` database.
 
 ## Future Features
 
-- [ ] **Exercise History on workout** - Add an ability to see what you did on that exercise from the last workout 
-- [ ] **PRs on workout view** — Flag any set that is a personal record at time of logging
-- [ ] **Inline cardio sets** — Add row machine / SkiErg sets mid-workout from the strength log form
-- [ ] **Dashboard streaks** — Current and longest workout streak displayed on the home screen
+- [x] **Exercise History on workout** - Add an ability to see what you did on that exercise from the last workout 
+- [x] **PRs on workout view** — Flag any set that is a personal record at time of logging
+- [x] **Inline cardio sets** — Add row machine / SkiErg sets mid-workout from the strength log form
+- [x] **Dashboard streaks** — Current and longest workout streak displayed on the home screen
 - [ ] **Exercise library — filter/sort by body part** — Add pill-tab filters across the top of the exercise library (All · Legs · Back · Chest · Shoulders · Arms · Core · Cardio) so you can quickly find exercises by muscle group instead of scrolling the full list
+- [ ] **Data export** — CSV export of all workout history for use in Excel/Sheets
 - [ ] **Progress charts for runs** — Distance and pace trends over time, similar to the weight progress chart
 - [ ] **Plan scheduling** — Link logged workouts back to specific plan days to track adherence
-- [ ] **Data export** — CSV export of all workout history for use in Excel/Sheets
 - [ ] **Unraid Docker template** — One-click install via Unraid Community Applications

@@ -46,7 +46,7 @@
     </div>
   </div>
 
-  <!-- Unit selector -->
+  <!-- Section header -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
     <h2 style="font-size:18px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:0;">EXERCISES</h2>
     <div style="display:flex;gap:6px;align-items:center;">
@@ -61,31 +61,34 @@
   <!-- Exercise blocks injected here -->
   <div id="exercises-container"></div>
 
-  <!-- Add Exercise button -->
-  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;border-style:dashed;"
-    onclick="addExercise()">
-    + Add Exercise
-  </button>
+  <!-- Add buttons -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+    <button type="button" class="btn btn-secondary btn-full" style="border-style:dashed;" onclick="addExercise()">
+      + Strength
+    </button>
+    <button type="button" class="btn btn-secondary btn-full" style="border-style:dashed;color:var(--run);border-color:color-mix(in srgb,var(--run) 40%,transparent);" onclick="addCardioSet()">
+      + Cardio
+    </button>
+  </div>
 
-  <!-- Save -->
   <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;">
     Save Workout ✓
   </button>
 </form>
 
-<!-- Hidden set index counter (global across all exercises) -->
 <input type="hidden" id="global-set-index" value="0"/>
+<input type="hidden" id="global-cardio-index" value="0"/>
 
 <script>
-  // Exercise list for the select dropdowns
   const exercises = [
     {% for ex in exercises %}
     { id: {{ ex.id }}, name: "{{ ex.name }}", group: "{{ ex.muscle_group or '' }}" },
     {% endfor %}
   ];
 
-  let globalSetIndex = 0;
-  let exerciseCount  = 0;
+  let globalSetIndex    = 0;
+  let globalCardioIndex = 0;
+  let exerciseCount     = 0;
 
   function buildExerciseOptions(selectedId) {
     let opts = '<option value="">Select exercise...</option>';
@@ -96,6 +99,7 @@
     return opts;
   }
 
+  // ── Strength exercise block ─────────────────────────────
   function addExercise(selectedExerciseId = '') {
     const exIdx = exerciseCount++;
     const unit  = document.getElementById('global-unit').value;
@@ -109,112 +113,147 @@
       <button type="button" onclick="this.closest('.exercise-block').remove()"
         style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;z-index:1;">✕</button>
 
-      <div class="form-group" style="margin-bottom:12px;padding-right:28px;">
+      <div class="form-group" style="margin-bottom:8px;padding-right:28px;">
         <label class="form-label">Exercise</label>
-        <select class="form-control exercise-select" onchange="persistExercise(this, ${exIdx})" required>
+        <select class="form-control exercise-select"
+          onchange="persistExercise(this, ${exIdx}); loadHistory(this.value, ${exIdx})"
+          required>
           ${buildExerciseOptions(selectedExerciseId)}
         </select>
       </div>
 
-      <div class="sets-row" id="sets-row-${exIdx}" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;align-items:flex-end;">
-        <!-- sets appended here horizontally -->
+      <!-- History strip injected here via HTMX-style fetch -->
+      <div id="history-${exIdx}" style="margin-bottom:4px;"></div>
+
+      <div class="sets-row" id="sets-row-${exIdx}"
+        style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;align-items:flex-end;">
       </div>
 
       <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;font-size:13px;"
-        onclick="addSet(${exIdx})">
-        + Add Set
-      </button>
+        onclick="addSet(${exIdx})">+ Add Set</button>
     `;
 
     document.getElementById('exercises-container').appendChild(block);
-
-    // Auto-add first set
     addSet(exIdx);
+
+    if (selectedExerciseId) loadHistory(selectedExerciseId, exIdx);
   }
 
-  function addSet(exIdx) {
-    const idx   = globalSetIndex++;
-    const unit  = document.getElementById('global-unit').value;
-    const row   = document.getElementById(`sets-row-${exIdx}`);
+  // ── Load last session + PR for an exercise ──────────────
+  async function loadHistory(exerciseId, exIdx) {
+    const container = document.getElementById(`history-${exIdx}`);
+    if (!exerciseId) { container.innerHTML = ''; return; }
+    container.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0;">Loading history...</div>';
+    const res  = await fetch(`/workouts/htmx/exercise-history?exercise_id=${exerciseId}`);
+    const html = await res.text();
+    container.innerHTML = html;
+  }
 
-    // Count existing non-removed sets in this block to determine set number
+  // ── Strength set card ───────────────────────────────────
+  function addSet(exIdx) {
+    const idx    = globalSetIndex++;
+    const unit   = document.getElementById('global-unit').value;
+    const row    = document.getElementById(`sets-row-${exIdx}`);
     const setNum = row.children.length + 1;
 
     const card = document.createElement('div');
     card.className = 'set-card';
-    card.style.cssText = `
-      background:var(--surface2);
-      border:1px solid var(--border);
-      border-radius:8px;
-      padding:10px;
-      min-width:110px;
-      flex-shrink:0;
-      position:relative;
-    `;
-
+    card.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;min-width:110px;flex-shrink:0;position:relative;';
     card.innerHTML = `
       <button type="button" onclick="this.closest('.set-card').remove()"
         style="position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;">✕</button>
-
-      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">
-        Set ${setNum}
-      </div>
-
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">Set ${setNum}</div>
       <input type="hidden" name="sets[${idx}][set_number]" value="${setNum}"/>
-
       <div style="margin-bottom:6px;">
         <label class="form-label" style="font-size:10px;">Weight</label>
         <input class="form-control" type="number" step="0.5" min="0"
           name="sets[${idx}][weight]" placeholder="0"
           style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;"/>
       </div>
-
       <div style="margin-bottom:6px;">
-        <select class="form-control unit-select" name="sets[${idx}][unit]"
-          style="padding:4px 6px;font-size:12px;">
+        <select class="form-control unit-select" name="sets[${idx}][unit]" style="padding:4px 6px;font-size:12px;">
           <option value="lbs" ${unit=='lbs'?'selected':''}>lbs</option>
           <option value="kg"  ${unit=='kg' ?'selected':''}>kg</option>
         </select>
       </div>
-
       <div style="margin-bottom:6px;">
         <label class="form-label" style="font-size:10px;">Reps</label>
         <input class="form-control" type="number" min="0"
           name="sets[${idx}][reps]" placeholder="0"
           style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;color:var(--accent);"/>
       </div>
-
       <div>
         <label class="form-label" style="font-size:10px;">RPE</label>
         <input class="form-control" type="number" step="0.5" min="1" max="10"
           name="sets[${idx}][rpe]" placeholder="—"
           style="text-align:center;padding:6px 4px;font-size:13px;"/>
       </div>
-
-      <!-- hidden: links this set to the exercise select in this block -->
-      <input type="hidden" class="set-exercise-ref" data-ex-idx="${exIdx}"
-        name="sets[${idx}][exercise_id]" value=""/>
+      <input type="hidden" class="set-exercise-ref" data-ex-idx="${exIdx}" name="sets[${idx}][exercise_id]" value=""/>
     `;
-
     row.appendChild(card);
-
-    // Wire up exercise select → hidden exercise_id on all sets in block
     syncExerciseToSets(exIdx);
-
-    // Focus the weight field of the new set
     card.querySelector('input[type="number"]').focus();
   }
 
+  // ── Inline cardio set ───────────────────────────────────
+  function addCardioSet() {
+    const idx = globalCardioIndex++;
+    const block = document.createElement('div');
+    block.className = 'card';
+    block.style.cssText = 'margin-bottom:10px;position:relative;border-color:color-mix(in srgb,var(--run) 35%,transparent);';
+    block.innerHTML = `
+      <button type="button" onclick="this.closest('.card').remove()"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--run);margin-bottom:12px;">
+        🚣 CARDIO SET
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <label class="form-label">Machine</label>
+          <select class="form-control" name="cardio[${idx}][machine]">
+            <option value="row">Row</option>
+            <option value="skierg">SkiErg</option>
+            <option value="bike">Assault Bike</option>
+            <option value="treadmill">Treadmill</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Distance (m)</label>
+          <input class="form-control" type="number" name="cardio[${idx}][distance_m]" placeholder="1000"
+            style="font-family:'DM Mono',monospace;"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div>
+          <label class="form-label">Time (MM:SS)</label>
+          <input class="form-control" name="cardio[${idx}][duration]" placeholder="4:00"
+            style="font-family:'DM Mono',monospace;"/>
+        </div>
+        <div>
+          <label class="form-label">Calories</label>
+          <input class="form-control" type="number" name="cardio[${idx}][calories]" placeholder="—"
+            style="font-family:'DM Mono',monospace;"/>
+        </div>
+        <div>
+          <label class="form-label">Damper</label>
+          <input class="form-control" type="number" min="1" max="10" name="cardio[${idx}][damper]" placeholder="4"
+            style="font-family:'DM Mono',monospace;"/>
+        </div>
+      </div>
+    `;
+    document.getElementById('exercises-container').appendChild(block);
+  }
+
+  // ── Helpers ─────────────────────────────────────────────
   function syncExerciseToSets(exIdx) {
     const block  = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
     if (!block) return;
     const select = block.querySelector('.exercise-select');
-    const refs   = block.querySelectorAll('.set-exercise-ref');
-    refs.forEach(r => r.value = select.value);
+    block.querySelectorAll('.set-exercise-ref').forEach(r => r.value = select.value);
   }
 
   function persistExercise(selectEl, exIdx) {
-    // When exercise changes, update all hidden exercise_id fields in this block
     syncExerciseToSets(exIdx);
   }
 

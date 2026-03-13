@@ -1,0 +1,45 @@
+{% if last_sets %}
+<div class="ex-history-strip" style="
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+    <span style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted);">
+      Last time · {{ last_date.strftime('%b %-d') }}
+    </span>
+    {% if pr_lbs %}
+    <span style="font-family:'DM Mono',monospace; font-size:11px; background:#ff4d00; color:#fff; padding:2px 7px; border-radius:4px; font-weight:600;">
+      PR {{ pr_lbs | int }} lbs
+    </span>
+    {% endif %}
+  </div>
+  <div style="display:flex; flex-wrap:wrap; gap:6px;">
+    {% for s in last_sets %}
+    <div style="
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      white-space: nowrap;
+    ">
+      {% if s.weight_lbs %}
+        <span style="color:var(--text); font-weight:600;">{{ s.weight_lbs | int }}</span>
+        <span style="color:var(--muted); font-size:10px;">lbs</span>
+        <span style="color:var(--muted);"> × </span>
+      {% endif %}
+      <span style="color:var(--accent); font-weight:600;">{{ s.reps or '?' }}</span>
+      <span style="color:var(--muted); font-size:10px;"> reps</span>
+      {% if s.rpe %}
+      <span style="color:var(--muted); font-size:10px; margin-left:4px;">@{{ s.rpe | float }}</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
