@@ -7,30 +7,33 @@ Designed to run on Unraid and be used at the gym from your phone.
 
 ## Features
 
-- **Dashboard** — YTD stats (workouts, weight lifted, distance, calories, BPM), last workout, active plan
+- **Dashboard** — YTD stats, streaks (current + best), last workout, active plan. Tap streaks to open calendar.
 - **5 workout types** — Strength, Run, Hyrox, Circuit, AMRAP
-- **Strength logging** — Exercises grouped horizontally by set, persist selected exercise, add/remove sets freely
+- **Strength logging** — Exercises grouped horizontally by set, shows last session + PR on exercise select, inline cardio sets
 - **Run logging** — Continuous, timed, or interval runs with per-segment tracking (warmup/interval/cooldown), skip flags
 - **Circuit & AMRAP** — Per-round data per exercise (reps, weight, time, distance, steps)
 - **Hyrox** — Full race logging with all 16 stations
 - **Edit any workout** — Full edit UI for all workout types, pre-filled with existing data
-- **Progress tracker** — Select any exercise and see max weight per session over time with a Chart.js line graph, PR highlighted, per-session breakdown
-- **Exercise library** — Searchable exercise database grouped by category, add custom exercises
+- **Workout view** — PR badges on sets, estimated 1RM per exercise (Epley formula)
+- **Progress tracker** — Strength: Max Weight / Volume / Est. 1RM charts per exercise. Runs: Distance + Pace charts with segment fallback for intervals
+- **Calendar** — Monthly view with color-coded workout days, multi-workout day modal, month summary (sessions, active days, PRs, km run, lbs lifted)
+- **Exercise library** — Filter by muscle group, add custom exercises
 - **Training plans** — Build multi-week plans with named days
-- **lbs / kg toggle** — Stored in session, toggle from the top bar. Both units always stored in DB
+- **Data export** — CSV export of all workouts, strength sets, and runs
+- **lbs / kg toggle** — Top bar toggle, both units always stored in DB
 - **Mobile-first UI** — Dark theme, bottom nav, sticky top bar, safe area insets for iPhone
 
 ---
 
 ## Tech Stack
 
-| Layer     | Tech                        |
-|-----------|-----------------------------|
-| Backend   | Python 3.11 + Flask 3       |
+| Layer     | Tech                           |
+|-----------|--------------------------------|
+| Backend   | Python 3.11 + Flask 3          |
 | Database  | PostgreSQL 16 (`forge` schema) |
-| Frontend  | HTMX + vanilla JS + Chart.js |
-| Fonts     | Bebas Neue, DM Sans, DM Mono |
-| Hosting   | Docker Compose on Unraid     |
+| Frontend  | HTMX + vanilla JS + Chart.js   |
+| Fonts     | Bebas Neue, DM Sans, DM Mono   |
+| Hosting   | Docker Compose on Unraid       |
 
 ---
 
@@ -123,19 +126,20 @@ forge_workout_tracker/
     ├── models.py            # SQLAlchemy models (13 tables)
     ├── utils.py             # lbs↔kg helpers
     ├── routes/
-    │   ├── main.py          # Dashboard + unit toggle
-    │   ├── workouts.py      # Log, view, edit, delete, history
-    │   ├── progress.py      # Progress chart data API
+    │   ├── main.py          # Dashboard, streaks, calendar
+    │   ├── workouts.py      # Log, view, edit, delete, history, CSV export
+    │   ├── progress.py      # Strength + run chart data APIs
     │   ├── plans.py         # Training plans
     │   └── exercises.py     # Exercise library
     └── templates/
         ├── base.html        # Layout, nav, log modal, unit toggle
         ├── index.html       # Dashboard
+        ├── calendar.html    # Monthly calendar view
         ├── progress/
-        │   └── index.html   # Progress chart page
+        │   └── index.html   # Strength (weight/volume/1RM) + run charts
         ├── workouts/
         │   ├── history.html
-        │   ├── view.html
+        │   ├── view.html    # PR badges, 1RM estimates
         │   ├── edit.html
         │   ├── log_strength.html
         │   ├── log_run.html
@@ -143,7 +147,12 @@ forge_workout_tracker/
         │   └── log_hyrox.html
         ├── plans/
         ├── exercises/
-        └── partials/        # HTMX row fragments
+        └── partials/
+            ├── exercise_history.html  # Last session + PR strip
+            ├── set_row.html
+            ├── interval_row.html
+            ├── circuit_exercise_row.html
+            └── plan_day_row.html
 ```
 
 ---
@@ -172,27 +181,23 @@ All tables live in the `forge` schema inside the `forge_workouts` database.
 
 ## Environment Variables
 
-| Variable      | Default         | Description                    |
-|---------------|-----------------|--------------------------------|
-| `DB_USER`     | `postgres`      | Postgres username               |
-| `DB_PASS`     | —               | Postgres password               |
-| `DB_HOST`     | `localhost`     | Postgres host                   |
-| `DB_PORT`     | `5432`          | Postgres port                   |
-| `DB_NAME`     | `forge_workouts`| Database name                   |
-| `DB_SCHEMA`   | `forge`         | Postgres schema                 |
-| `SECRET_KEY`  | —               | Flask session secret            |
-| `WEIGHT_UNIT` | `lbs`           | Default unit (`lbs` or `kg`)    |
+| Variable      | Default          | Description                 |
+|---------------|------------------|-----------------------------|
+| `DB_USER`     | `postgres`       | Postgres username            |
+| `DB_PASS`     | —                | Postgres password            |
+| `DB_HOST`     | `localhost`      | Postgres host                |
+| `DB_PORT`     | `5432`           | Postgres port                |
+| `DB_NAME`     | `forge_workouts` | Database name                |
+| `DB_SCHEMA`   | `forge`          | Postgres schema              |
+| `SECRET_KEY`  | —                | Flask session secret         |
+| `WEIGHT_UNIT` | `lbs`            | Default unit (`lbs` or `kg`) |
 
 ---
 
 ## Future Features
 
-- [x] **Exercise History on workout** - Add an ability to see what you did on that exercise from the last workout 
-- [x] **PRs on workout view** — Flag any set that is a personal record at time of logging
-- [x] **Inline cardio sets** — Add row machine / SkiErg sets mid-workout from the strength log form
-- [x] **Dashboard streaks** — Current and longest workout streak displayed on the home screen
-- [ ] **Exercise library — filter/sort by body part** — Add pill-tab filters across the top of the exercise library (All · Legs · Back · Chest · Shoulders · Arms · Core · Cardio) so you can quickly find exercises by muscle group instead of scrolling the full list
-- [ ] **Data export** — CSV export of all workout history for use in Excel/Sheets
-- [ ] **Progress charts for runs** — Distance and pace trends over time, similar to the weight progress chart
-- [ ] **Plan scheduling** — Link logged workouts back to specific plan days to track adherence
-- [ ] **Unraid Docker template** — One-click install via Unraid Community Applications
+- [ ] **Garmin sync** — Import `.fit` files via `fitparse` + `garminconnect` Python libraries. Would auto-populate run sessions with HR, pace splits, and GPS data from Garmin Connect without manual entry.
+- [ ] **Workout templates** — Save a logged workout as a reusable template, then start a new session pre-filled with the same exercises and sets. Big gym QoL improvement.
+- [ ] **Plan scheduling** — Link logged workouts back to specific plan days to track adherence vs. plan.
+- [ ] **Hyrox race comparison** — Side-by-side station breakdown across multiple races to track splits over time.
+- [ ] **Unraid Docker template** — One-click install via Unraid Community Applications.

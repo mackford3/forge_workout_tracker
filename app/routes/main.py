@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, session, redirect, request, url_fo
 from sqlalchemy import func, extract
 from datetime import datetime, timedelta, date
 from ..models import db, Workout, WorkoutSet, Run, WorkoutPlan, HyroxResult
+from sqlalchemy import extract as db_extract
 
 main_bp = Blueprint('main', __name__)
 
@@ -115,3 +116,97 @@ def set_unit(unit):
     if unit in ('kg', 'lbs'):
         session['weight_unit'] = unit
     return ('', 204)
+
+
+# ── Calendar view ──────────────────────────────────────────
+@main_bp.route('/calendar')
+@main_bp.route('/calendar/<int:year>/<int:month>')
+def calendar(year=None, month=None):
+    from calendar import monthcalendar
+    now = datetime.utcnow()
+    year  = year  or now.year
+    month = month or now.month
+
+    # All workouts in this month
+    from ..models import Workout
+    workouts = Workout.query.filter(
+        db_extract('year',  Workout.completed_at) == year,
+        db_extract('month', Workout.completed_at) == month,
+    ).order_by(Workout.completed_at).all()
+
+    # Build day_map: {day_int: [workout, ...]}
+    day_map = {}
+    for w in workouts:
+        d = w.completed_at.day
+        day_map.setdefault(d, []).append(w)
+
+    # Prev / next month
+    if month == 1:
+        prev_year, prev_month = year - 1, 12
+    else:
+        prev_year, prev_month = year, month - 1
+    if month == 12:
+        next_year, next_month = year + 1, 1
+    else:
+        next_year, next_month = year, month + 1
+
+    import calendar as cal_mod
+    cal_weeks  = monthcalendar(year, month)
+    month_name = cal_mod.month_name[month]
+
+    workout_ids = [w.id for w in workouts]
+
+    # ── Month summary stats ─────────────────────────────────
+    # Total weight lifted
+    month_weight = 0
+    month_prs    = 0
+    if workout_ids:
+        from ..models import WorkoutSet, Run, RunSegment
+        wt = db.session.query(
+            func.sum(WorkoutSet.weight_lbs * WorkoutSet.reps)
+        ).filter(
+            WorkoutSet.workout_id.in_(workout_ids),
+            WorkoutSet.weight_lbs.isnot(None),
+            WorkoutSet.reps.isnot(None),
+            WorkoutSet.skipped.is_(False),
+        ).scalar()
+        month_weight = float(wt) if wt else 0
+
+        # PRs: sets where weight equals all-time max for that exercise up to that date
+        all_sets = db.session.query(WorkoutSet).filter(
+            WorkoutSet.workout_id.in_(workout_ids),
+            WorkoutSet.weight_lbs.isnot(None),
+            WorkoutSet.skipped.is_(False),
+        ).all()
+        for s in all_sets:
+            lifetime_max = db.session.query(func.max(WorkoutSet.weight_lbs))                 .join(Workout)                 .filter(
+                    WorkoutSet.exercise_id == s.exercise_id,
+                    WorkoutSet.skipped.is_(False),
+                    Workout.completed_at <= s.workout.completed_at,
+                ).scalar()
+            if lifetime_max and abs(float(s.weight_lbs) - float(lifetime_max)) < 0.01:
+                month_prs += 1
+
+        # Distance: sum run totals + segment fallback
+        month_distance = 0
+        runs = db.session.query(Run).filter(Run.workout_id.in_(workout_ids)).all()
+        for r in runs:
+            if r.total_distance_km:
+                month_distance += float(r.total_distance_km)
+            else:
+                seg_dist = db.session.query(func.sum(RunSegment.distance_km))                     .filter(RunSegment.run_id == r.id, RunSegment.skipped.is_(False)).scalar()
+                if seg_dist:
+                    month_distance += float(seg_dist)
+    else:
+        month_distance = 0
+
+    return render_template('calendar.html',
+        year=year, month=month, month_name=month_name,
+        cal_weeks=cal_weeks, day_map=day_map,
+        prev_year=prev_year, prev_month=prev_month,
+        next_year=next_year, next_month=next_month,
+        today=datetime.utcnow().date(),
+        month_weight=month_weight,
+        month_distance=month_distance,
+        month_prs=month_prs,
+    )

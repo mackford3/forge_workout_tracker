@@ -4,104 +4,284 @@
 {% block content %}
 <div class="page-header">
   <h1>📈 PROGRESS</h1>
-  <p>Track weight over time per exercise</p>
 </div>
 
-<div class="card" style="margin-bottom:12px;">
-  <div class="form-group" style="margin-bottom:0;">
-    <label class="form-label">Select Exercise</label>
-    <select id="exercise-select" class="form-control" onchange="loadChart(this.value)">
-      <option value="">Choose an exercise...</option>
-      {% set current_group = namespace(v='') %}
-      {% for ex in exercises %}
-        {% if ex.muscle_group != current_group.v %}
-          {% if current_group.v %}</optgroup>{% endif %}
-          <optgroup label="{{ ex.muscle_group or 'Other' }}">
-          {% set current_group.v = ex.muscle_group %}
-        {% endif %}
-        <option value="{{ ex.id }}">{{ ex.name }}</option>
-      {% endfor %}
-      {% if current_group.v %}</optgroup>{% endif %}
-    </select>
-  </div>
+<!-- Tabs -->
+<div class="pill-tabs" style="margin-bottom:16px;">
+  <a class="pill active" id="tab-strength" onclick="switchTab('strength')" href="#">Strength</a>
+  <a class="pill"        id="tab-runs"     onclick="switchTab('runs')"     href="#">Runs</a>
 </div>
 
-<!-- Chart area -->
-<div id="chart-container" style="display:none;">
-  <div class="card" style="margin-bottom:10px;">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;">
-      <div id="chart-title" style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent);"></div>
-      <div id="chart-pr" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);"></div>
+<!-- ── STRENGTH TAB ── -->
+<div id="pane-strength">
+  <div class="card" style="margin-bottom:12px;">
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Select Exercise</label>
+      <select id="exercise-select" class="form-control" onchange="loadStrengthChart(this.value)">
+        <option value="">Choose an exercise...</option>
+        {% set current_group = namespace(v='') %}
+        {% for ex in exercises %}
+          {% if ex.muscle_group != current_group.v %}
+            {% if current_group.v %}</optgroup>{% endif %}
+            <optgroup label="{{ ex.muscle_group or 'Other' }}">
+            {% set current_group.v = ex.muscle_group %}
+          {% endif %}
+          <option value="{{ ex.id }}">{{ ex.name }}</option>
+        {% endfor %}
+        {% if current_group.v %}</optgroup>{% endif %}
+      </select>
     </div>
-    <canvas id="progress-chart" style="width:100%;max-height:260px;"></canvas>
   </div>
 
-  <!-- Session breakdown -->
-  <div id="session-list"></div>
+  <div class="pill-tabs" id="strength-metric-tabs" style="margin-bottom:12px;display:none;">
+    <a class="pill active" id="sm-weight" onclick="setStrengthMetric('weight')" href="#">Max Weight</a>
+    <a class="pill"        id="sm-volume" onclick="setStrengthMetric('volume')" href="#">Volume</a>
+    <a class="pill"        id="sm-1rm"    onclick="setStrengthMetric('1rm')"    href="#">Est. 1RM</a>
+  </div>
+
+  <div id="strength-chart-container" style="display:none;">
+    <div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;">
+        <div id="strength-chart-title" style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent);"></div>
+        <div id="strength-chart-pr" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);"></div>
+      </div>
+      <canvas id="strength-chart" style="width:100%;max-height:260px;"></canvas>
+    </div>
+    <div id="strength-session-list"></div>
+  </div>
+  <div id="strength-empty" style="display:none;" class="card">
+    <div style="text-align:center;padding:20px;color:var(--muted);">No weight data for this exercise.</div>
+  </div>
+  <div id="strength-loading" style="display:none;text-align:center;padding:40px;color:var(--muted);">Loading...</div>
 </div>
 
-<div id="empty-state" style="display:none;" class="card">
-  <div style="text-align:center;padding:20px 0;color:var(--muted);">No weight data found for this exercise.</div>
+<!-- ── RUNS TAB ── -->
+<div id="pane-runs" style="display:none;">
+  <div class="pill-tabs" style="margin-bottom:12px;">
+    <a class="pill active" id="run-metric-dist"  onclick="setRunMetric('distance')" href="#">Distance</a>
+    <a class="pill"        id="run-metric-pace"  onclick="setRunMetric('pace')"     href="#">Pace</a>
+  </div>
+
+  <div id="run-chart-container" style="display:none;">
+    <div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;">
+        <div id="run-chart-title" style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--run);"></div>
+        <div id="run-chart-best" style="font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);"></div>
+      </div>
+      <canvas id="run-chart" style="width:100%;max-height:260px;"></canvas>
+    </div>
+    <div id="run-session-list"></div>
+  </div>
+  <div id="run-loading" style="text-align:center;padding:40px;color:var(--muted);">Loading runs...</div>
+  <div id="run-empty"   style="display:none;" class="card">
+    <div style="text-align:center;padding:20px;color:var(--muted);">No run data with distance found.</div>
+  </div>
 </div>
 
-<div id="loading" style="display:none;text-align:center;padding:40px;color:var(--muted);">Loading...</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-let chartInstance = null;
+const WEIGHT_UNIT = '{{ weight_unit }}';
+let strengthChart = null;
+let strengthData   = null;
+let strengthMetric = 'weight';
+let runChart      = null;
+let runData       = null;
+let runMetric     = 'distance';
+let activeTab     = 'strength';
 
-async function loadChart(exerciseId) {
+// ── Tab switching ────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  ['strength','runs'].forEach(t => {
+    document.getElementById(`pane-${t}`).style.display   = t === tab ? '' : 'none';
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+  });
+  if (tab === 'runs' && !runData) loadRunData();
+  return false;
+}
+
+// ── Strength chart ───────────────────────────────────────
+async function loadStrengthChart(exerciseId) {
   if (!exerciseId) return;
-
-  document.getElementById('chart-container').style.display = 'none';
-  document.getElementById('empty-state').style.display     = 'none';
-  document.getElementById('loading').style.display         = 'block';
+  document.getElementById('strength-chart-container').style.display = 'none';
+  document.getElementById('strength-metric-tabs').style.display     = 'none';
+  document.getElementById('strength-empty').style.display           = 'none';
+  document.getElementById('strength-loading').style.display         = 'block';
 
   const res  = await fetch(`/progress/data?exercise_id=${exerciseId}`);
-  const data = await res.json();
+  strengthData = await res.json();
+  document.getElementById('strength-loading').style.display = 'none';
 
-  document.getElementById('loading').style.display = 'none';
+  if (!strengthData.length) { document.getElementById('strength-empty').style.display = 'block'; return; }
 
-  if (!data.length) {
-    document.getElementById('empty-state').style.display = 'block';
-    return;
+  document.getElementById('strength-metric-tabs').style.display = 'flex';
+  renderStrengthChart();
+}
+
+function setStrengthMetric(metric) {
+  strengthMetric = metric;
+  ['weight','volume','1rm'].forEach(m => {
+    document.getElementById(`sm-${m}`).classList.toggle('active', m === metric);
+  });
+  if (strengthData) renderStrengthChart();
+  return false;
+}
+
+function renderStrengthChart() {
+  const data   = strengthData;
+  const unit   = WEIGHT_UNIT;
+  const exName = document.getElementById('exercise-select').selectedOptions[0].text;
+
+  let values, bestVal, titleSuffix, tickFmt, lineColor, bestLabel;
+
+  if (strengthMetric === 'weight') {
+    values      = data.map(d => unit === 'lbs' ? d.max_lbs : d.max_kg);
+    bestVal     = Math.max(...values);
+    titleSuffix = `Max Weight`;
+    tickFmt     = v => `${v} ${unit}`;
+    lineColor   = '#e8ff00';
+    bestLabel   = `PR: ${bestVal} ${unit}`;
+  } else if (strengthMetric === 'volume') {
+    values      = data.map(d => unit === 'lbs' ? d.volume_lbs : d.volume_kg);
+    bestVal     = Math.max(...values);
+    titleSuffix = `Volume`;
+    tickFmt     = v => `${v.toLocaleString()} ${unit}`;
+    lineColor   = '#b44dff';
+    bestLabel   = `Best: ${bestVal.toLocaleString()} ${unit}`;
+  } else {
+    values      = data.map(d => unit === 'lbs' ? d.est_1rm_lbs : d.est_1rm_kg);
+    bestVal     = Math.max(...values);
+    titleSuffix = `Est. 1RM`;
+    tickFmt     = v => `${v} ${unit}`;
+    lineColor   = '#ff4d00';
+    bestLabel   = `Best 1RM: ${bestVal} ${unit}`;
   }
 
-  const unit    = '{{ weight_unit }}';
-  const labels  = data.map(d => {
-    const dt = new Date(d.date);
-    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const labels = data.map(d => fmtDate(d.date));
+  const pointColors = values.map(v => v === bestVal ? '#ff4d00' : lineColor);
+
+  document.getElementById('strength-chart-title').textContent = exName;
+  document.getElementById('strength-chart-pr').textContent    = bestLabel;
+  document.getElementById('strength-chart-container').style.display = 'block';
+
+  if (strengthChart) strengthChart.destroy();
+  strengthChart = buildLineChart('strength-chart', labels, values, pointColors, lineColor, unit, tickFmt);
+
+  // Session list
+  const list = document.getElementById('strength-session-list');
+  list.innerHTML = '';
+  [...data].reverse().forEach(d => {
+    const dispVal  = unit === 'lbs'
+      ? (strengthMetric==='weight' ? d.max_lbs : strengthMetric==='volume' ? d.volume_lbs : d.est_1rm_lbs)
+      : (strengthMetric==='weight' ? d.max_kg  : strengthMetric==='volume' ? d.volume_kg  : d.est_1rm_kg);
+    const isBest   = dispVal === bestVal;
+    const setsHtml = d.sets.map(s =>
+      `<span style="font-family:'DM Mono',monospace;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;">${s.lbs}${unit} × ${s.reps||'?'}</span>`
+    ).join(' ');
+    const badge = isBest
+      ? `<span style="font-family:'DM Mono',monospace;font-size:10px;background:#ff4d00;color:#fff;padding:2px 6px;border-radius:4px;">${strengthMetric==='weight'?'PR':strengthMetric==='volume'?'PEAK VOL':'BEST 1RM'}</span>`
+      : '';
+    const dispStr = strengthMetric === 'volume'
+      ? `${dispVal.toLocaleString()} ${unit}`
+      : `${dispVal} ${unit}`;
+    list.innerHTML += `<a href="/workouts/${d.workout_id}" style="display:block;text-decoration:none;color:var(--text);">
+      <div class="card card-sm" style="margin-bottom:8px;${isBest?'border-color:#ff4d00;':''}">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="font-size:13px;color:var(--muted);">${fmtDateLong(d.date)}</span>
+          ${badge}
+          <span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:${lineColor};">${dispStr}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;">${setsHtml}</div>
+      </div></a>`;
   });
-  const weights = data.map(d => unit === 'lbs' ? d.max_lbs : d.max_kg);
-  const maxW    = Math.max(...weights);
-  const exName  = document.getElementById('exercise-select').selectedOptions[0].text;
+}
 
-  document.getElementById('chart-title').textContent = exName;
-  document.getElementById('chart-pr').textContent    = `PR: ${maxW} ${unit}`;
-  document.getElementById('chart-container').style.display = 'block';
+// ── Run charts ───────────────────────────────────────────
+async function loadRunData() {
+  document.getElementById('run-loading').style.display = 'block';
+  const res = await fetch('/progress/run-data');
+  runData   = await res.json();
+  document.getElementById('run-loading').style.display = 'none';
 
-  if (chartInstance) chartInstance.destroy();
+  if (!runData.length) { document.getElementById('run-empty').style.display = 'block'; return; }
+  renderRunChart();
+}
 
-  const ctx = document.getElementById('progress-chart').getContext('2d');
-  chartInstance = new Chart(ctx, {
+function setRunMetric(metric) {
+  runMetric = metric;
+  ['dist','pace'].forEach(m => {
+    document.getElementById(`run-metric-${m}`).classList.toggle('active', m === metric.slice(0,4));
+  });
+  if (runData) renderRunChart();
+  return false;
+}
+
+function renderRunChart() {
+  if (!runData || !runData.length) return;
+
+  const isDistance = runMetric === 'distance';
+  const values  = runData.map(d => isDistance ? d.distance_km : d.pace_s);
+  const labels  = runData.map(d => fmtDate(d.date));
+  const bestVal = isDistance ? Math.max(...values) : Math.min(...values.filter(Boolean));
+  const color   = '#00e5ff';
+
+  document.getElementById('run-chart-title').textContent =
+    isDistance ? 'Distance (km)' : 'Pace (min/km)';
+  document.getElementById('run-chart-best').textContent =
+    isDistance ? `Best: ${bestVal.toFixed(2)} km` : `Best: ${fmtPace(bestVal)} /km (lower = faster)`;
+  document.getElementById('run-chart-container').style.display = 'block';
+
+  const pointColors = values.map(v =>
+    isDistance ? (v === bestVal ? '#ff4d00' : color)
+               : (v === bestVal ? '#ff4d00' : color)
+  );
+
+  if (runChart) runChart.destroy();
+  // For pace, invert axis (lower = better)
+  runChart = buildLineChart('run-chart', labels, values, pointColors, color,
+    isDistance ? 'km' : 'pace',
+    v => isDistance ? `${v.toFixed(2)} km` : fmtPace(v)
+  );
+
+  // Session list
+  const list = document.getElementById('run-session-list');
+  list.innerHTML = '';
+  [...runData].reverse().forEach(d => {
+    const isBest = isDistance ? d.distance_km === bestVal : d.pace_s === bestVal;
+    list.innerHTML += `<a href="/workouts/${d.workout_id}" style="display:block;text-decoration:none;color:var(--text);">
+      <div class="card card-sm" style="margin-bottom:8px;${isBest?'border-color:#ff4d00;':''}">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div>
+            <div style="font-size:13px;color:var(--muted);">${fmtDateLong(d.date)}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">${d.workout_name}</div>
+          </div>
+          ${isBest?'<span style="font-family:\'DM Mono\',monospace;font-size:10px;background:#ff4d00;color:#fff;padding:2px 6px;border-radius:4px;">BEST</span>':''}
+          <div style="margin-left:auto;text-align:right;">
+            <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--run);">${d.distance_km.toFixed(2)} km</div>
+            ${d.pace_str ? `<div style="font-size:11px;color:var(--muted);">${d.pace_str}/km</div>` : ''}
+            ${d.interval_count > 0 ? `<div style="font-size:11px;color:var(--muted);">${d.interval_count} intervals</div>` : ''}
+          </div>
+        </div>
+      </div></a>`;
+  });
+}
+
+// ── Chart factory ────────────────────────────────────────
+function buildLineChart(canvasId, labels, values, pointColors, lineColor, unitLabel, tickFmt, reverseY=false) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  return new Chart(ctx, {
     type: 'line',
     data: {
       labels,
       datasets: [{
-        label: `Max weight (${unit})`,
-        data: weights,
-        borderColor: '#e8ff00',
-        backgroundColor: 'rgba(232,255,0,0.08)',
-        pointBackgroundColor: data.map(d => {
-          const w = unit === 'lbs' ? d.max_lbs : d.max_kg;
-          return w === maxW ? '#ff4d00' : '#e8ff00';
-        }),
-        pointRadius: data.map(d => {
-          const w = unit === 'lbs' ? d.max_lbs : d.max_kg;
-          return w === maxW ? 7 : 5;
-        }),
+        data: values,
+        borderColor: lineColor,
+        backgroundColor: lineColor.replace(')', ',0.08)').replace('rgb','rgba'),
+        pointBackgroundColor: pointColors,
+        pointRadius: 5,
         tension: 0.3,
         fill: true,
       }]
@@ -112,63 +292,34 @@ async function loadChart(exerciseId) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const d = data[ctx.dataIndex];
-              const w = unit === 'lbs' ? d.max_lbs : d.max_kg;
-              return ` ${w} ${unit} — ${d.workout_name}`;
-            },
-            afterLabel: (ctx) => {
-              const d = data[ctx.dataIndex];
-              return d.sets.map(s => `  Set ${s.set}: ${s.lbs}lbs × ${s.reps || '?'}`);
-            }
-          },
-          backgroundColor: '#1a1a1a',
-          borderColor: '#2a2a2a',
-          borderWidth: 1,
-          titleColor: '#e8ff00',
-          bodyColor: '#f0f0f0',
-          padding: 12,
+          backgroundColor: '#1a1a1a', borderColor: '#2a2a2a', borderWidth: 1,
+          titleColor: lineColor, bodyColor: '#f0f0f0', padding: 12,
         }
       },
       scales: {
-        x: {
-          grid:   { color: '#1a1a1a' },
-          ticks:  { color: '#666', font: { family: 'DM Mono', size: 11 } }
-        },
+        x: { grid: { color: '#1a1a1a' }, ticks: { color: '#666', font: { family: 'DM Mono', size: 11 } } },
         y: {
-          grid:   { color: '#1a1a1a' },
-          ticks:  { color: '#666', font: { family: 'DM Mono', size: 11 },
-                    callback: v => `${v} ${unit}` }
+          reverse: reverseY,
+          grid: { color: '#1a1a1a' },
+          ticks: { color: '#666', font: { family: 'DM Mono', size: 11 }, callback: tickFmt }
         }
       }
     }
   });
+}
 
-  // Session list
-  const list = document.getElementById('session-list');
-  list.innerHTML = '';
-  [...data].reverse().forEach(d => {
-    const w = unit === 'lbs' ? d.max_lbs : d.max_kg;
-    const isPR = w === maxW;
-    const dt = new Date(d.date);
-    const dateStr = dt.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
-    const setsHtml = d.sets.map(s =>
-      `<span style="font-family:'DM Mono',monospace;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;">${s.lbs}${unit} × ${s.reps || '?'}</span>`
-    ).join(' ');
-
-    list.innerHTML += `
-      <a href="/workouts/${d.workout_id}" style="display:block;text-decoration:none;color:var(--text);">
-        <div class="card card-sm" style="margin-bottom:8px;${isPR ? 'border-color:#ff4d00;' : ''}">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <span style="font-size:13px;color:var(--muted);">${dateStr}</span>
-            ${isPR ? '<span style="font-family:\'DM Mono\',monospace;font-size:10px;background:#ff4d00;color:#fff;padding:2px 6px;border-radius:4px;">PR</span>' : ''}
-            <span style="margin-left:auto;font-family:\'DM Mono\',monospace;font-size:16px;font-weight:700;color:var(--accent);">${w} ${unit}</span>
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px;">${setsHtml}</div>
-        </div>
-      </a>`;
-  });
+// ── Helpers ──────────────────────────────────────────────
+function fmtDate(dateStr) {
+  const dt = new Date(dateStr + 'T12:00:00');
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function fmtDateLong(dateStr) {
+  const dt = new Date(dateStr + 'T12:00:00');
+  return dt.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+}
+function fmtPace(s) {
+  if (!s) return '—';
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
 }
 </script>
 {% endblock %}

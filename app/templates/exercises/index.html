@@ -10,23 +10,40 @@
   <a href="{{ url_for('exercises.new') }}" class="btn btn-primary btn-sm">+ Add</a>
 </div>
 
-{% for category, exs in grouped.items() %}
-<div style="margin-bottom:20px;">
-  <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">
-    {{ category|upper }}
-  </div>
-  {% for ex in exs %}
-  <div class="card card-sm" style="margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
-    <div>
-      <span style="font-weight:500;font-size:14px;">{{ ex.name }}</span>
-      {% if ex.muscle_group %}<span style="font-size:12px;color:var(--muted);margin-left:8px;">{{ ex.muscle_group }}</span>{% endif %}
-    </div>
-    <form method="post" action="{{ url_for('exercises.delete', ex_id=ex.id) }}"
-          onsubmit="return confirm('Delete {{ ex.name }}?')">
-      <button type="submit" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;" title="Delete">✕</button>
-    </form>
-  </div>
+<!-- Muscle group filter pills -->
+<div class="pill-tabs" style="margin-bottom:16px;">
+  <a class="pill {{ 'active' if not muscle_filter }}" href="{{ url_for('exercises.index') }}">All</a>
+  {% for muscle in all_muscles %}
+  <a class="pill {{ 'active' if muscle_filter == muscle }}"
+     href="{{ url_for('exercises.index', muscle=muscle) }}">{{ muscle }}</a>
   {% endfor %}
 </div>
-{% endfor %}
+
+{% if grouped %}
+  {% for category, exs in grouped.items() %}
+  <div style="margin-bottom:20px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+      {{ category|upper }}
+    </div>
+    {% for ex in exs %}
+    <div class="card card-sm" style="margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <span style="font-weight:500;font-size:14px;">{{ ex.name }}</span>
+        {% if ex.muscle_group %}
+        <span style="font-size:12px;color:var(--muted);margin-left:8px;">{{ ex.muscle_group }}</span>
+        {% endif %}
+      </div>
+      <form method="post" action="{{ url_for('exercises.delete', ex_id=ex.id) }}"
+            onsubmit="return confirm('Delete {{ ex.name }}?')">
+        <button type="submit" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;" title="Delete">✕</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card" style="text-align:center;padding:32px;color:var(--muted);">
+    No exercises found{% if muscle_filter %} for {{ muscle_filter }}{% endif %}.
+  </div>
+{% endif %}
 {% endblock %}
