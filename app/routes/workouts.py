@@ -82,8 +82,15 @@ def log_strength():
         db.session.add(workout)
         db.session.flush()
 
-        i = 0
-        while f.get(f'sets[{i}][exercise_id]'):
+        # Collect all set indices from form (non-contiguous safe)
+        set_indices = sorted(set(
+            int(k.split('[')[1].split(']')[0])
+            for k in f.keys() if k.startswith('sets[') and '[exercise_id]' in k
+        ))
+        for i in set_indices:
+            ex_id = f.get(f'sets[{i}][exercise_id]')
+            if not ex_id:
+                continue
             weight_raw = f.get(f'sets[{i}][weight]') or None
             unit       = f.get(f'sets[{i}][unit]', 'lbs')
             weight_kg = weight_lbs = None
@@ -97,7 +104,7 @@ def log_strength():
                     weight_lbs = w * 2.20462
             db.session.add(WorkoutSet(
                 workout_id  = workout.id,
-                exercise_id = int(f[f'sets[{i}][exercise_id]']),
+                exercise_id = int(ex_id),
                 set_number  = int(f.get(f'sets[{i}][set_number]', i + 1)),
                 weight_kg   = weight_kg,
                 weight_lbs  = weight_lbs,
@@ -105,11 +112,14 @@ def log_strength():
                 rpe         = float(f[f'sets[{i}][rpe]']) if f.get(f'sets[{i}][rpe]') else None,
                 notes       = f.get(f'sets[{i}][notes]'),
             ))
-            i += 1
 
-        # Inline cardio sets
-        j = 0
-        while f.get(f'cardio[{j}][machine]'):
+        # Inline cardio sets — collect all cardio indices non-contiguously
+        cardio_indices = sorted(set(
+            int(k.split('[')[1].split(']')[0])
+            for k in f.keys() if k.startswith('cardio[') and '[machine]' in k
+        ))
+        has_cardio = len(cardio_indices) > 0
+        for j in cardio_indices:
             db.session.add(CardioSet(
                 workout_id   = workout.id,
                 machine      = f[f'cardio[{j}][machine]'],
@@ -118,10 +128,33 @@ def log_strength():
                 duration_s   = _time_to_seconds(f.get(f'cardio[{j}][duration]')),
                 calories     = int(f[f'cardio[{j}][calories]'])   if f.get(f'cardio[{j}][calories]')   else None,
                 damper       = int(f[f'cardio[{j}][damper]'])     if f.get(f'cardio[{j}][damper]')     else None,
+                rpe          = float(f[f'cardio[{j}][rpe]']) if f.get(f'cardio[{j}][rpe]') else None,
             ))
-            j += 1
+
+        # Dual tag: if strength + cardio, mark as strength+cardio
+        if has_cardio and len(set_indices) > 0:
+            workout.workout_type = 'strength+cardio'
 
         db.session.commit()
+
+        # Auto-link to program day if started from program
+        program_day_id = f.get('program_day_id')
+        if program_day_id:
+            from ..models import ProgramCompletion, ProgramDay
+            day  = ProgramDay.query.get(int(program_day_id))
+            if day:
+                comp = ProgramCompletion.query.filter_by(day_id=day.id).first()
+                if not comp:
+                    comp = ProgramCompletion(day_id=day.id)
+                    db.session.add(comp)
+                comp.workout_id = workout.id
+                comp.completed  = True
+                comp.status     = 'done'
+                comp.done_date  = workout.completed_at.date()
+                db.session.commit()
+                return redirect(url_for('program.week',
+                    program_id=day.program_id, week_num=day.week_number))
+
         return redirect(url_for('workouts.view', workout_id=workout.id))
 
     return render_template('workouts/log_strength.html', exercises=exercises,
@@ -442,12 +475,18 @@ def edit(workout_id):
         if f.get('completed_at'):
             workout.completed_at = datetime.fromisoformat(f['completed_at'])
 
-        # ── Strength ────────────────────────────────────────
-        if wtype == 'strength':
-            # Delete existing sets and re-insert
+        # ── Strength / Strength+Cardio ──────────────────────
+        if wtype in ('strength', 'strength+cardio'):
+            # Delete existing sets and re-insert (non-contiguous index safe)
             WorkoutSet.query.filter_by(workout_id=workout.id).delete()
-            i = 0
-            while f.get(f'sets[{i}][exercise_id]'):
+            set_indices = sorted(set(
+                int(k.split('[')[1].split(']')[0])
+                for k in f.keys() if k.startswith('sets[') and '[exercise_id]' in k
+            ))
+            for i in set_indices:
+                ex_id = f.get(f'sets[{i}][exercise_id]')
+                if not ex_id:
+                    continue
                 weight_raw = f.get(f'sets[{i}][weight]') or None
                 unit       = f.get(f'sets[{i}][unit]', 'lbs')
                 weight_kg = weight_lbs = None
@@ -459,7 +498,7 @@ def edit(workout_id):
                         weight_kg = w; weight_lbs = w * 2.20462
                 db.session.add(WorkoutSet(
                     workout_id  = workout.id,
-                    exercise_id = int(f[f'sets[{i}][exercise_id]']),
+                    exercise_id = int(ex_id),
                     set_number  = int(f.get(f'sets[{i}][set_number]', i + 1)),
                     weight_kg   = weight_kg,
                     weight_lbs  = weight_lbs,
@@ -467,7 +506,30 @@ def edit(workout_id):
                     rpe         = float(f[f'sets[{i}][rpe]'])  if f.get(f'sets[{i}][rpe]')    else None,
                     notes       = f.get(f'sets[{i}][notes]'),
                 ))
-                i += 1
+
+            # Re-save cardio sets
+            CardioSet.query.filter_by(workout_id=workout.id).delete()
+            cardio_indices = sorted(set(
+                int(k.split('[')[1].split(']')[0])
+                for k in f.keys() if k.startswith('cardio[') and '[machine]' in k
+            ))
+            has_cardio = len(cardio_indices) > 0
+            for j in cardio_indices:
+                db.session.add(CardioSet(
+                    workout_id   = workout.id,
+                    machine      = f[f'cardio[{j}][machine]'],
+                    set_number   = j + 1,
+                    distance_m   = int(f[f'cardio[{j}][distance_m]']) if f.get(f'cardio[{j}][distance_m]') else None,
+                    duration_s   = _time_to_seconds(f.get(f'cardio[{j}][duration]')),
+                    calories     = int(f[f'cardio[{j}][calories]'])   if f.get(f'cardio[{j}][calories]')   else None,
+                    damper       = int(f[f'cardio[{j}][damper]'])     if f.get(f'cardio[{j}][damper]')     else None,
+                    rpe          = float(f[f'cardio[{j}][rpe]']) if f.get(f'cardio[{j}][rpe]') else None,
+                ))
+            # Update workout type
+            if has_cardio and len(set_indices) > 0:
+                workout.workout_type = 'strength+cardio'
+            elif len(set_indices) > 0:
+                workout.workout_type = 'strength'
 
         # ── Circuit / AMRAP ─────────────────────────────────
         elif wtype in ('circuit', 'amrap'):

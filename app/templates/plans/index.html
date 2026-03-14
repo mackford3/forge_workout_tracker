@@ -1,13 +1,61 @@
 {% extends 'base.html' %}
-{% block title %}Training Plans{% endblock %}
+{% block title %}Plans & Programs{% endblock %}
 
 {% block content %}
-<div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;">
-  <div>
-    <h1>PLANS</h1>
-    <p>Build and manage your training</p>
+<div class="page-header">
+  <h1>PLANS & PROGRAMS</h1>
+  <p>Training structure and custom plans</p>
+</div>
+
+<!-- ── Active Program ── -->
+{% for p in programs %}
+{% if p.is_active %}
+<div class="card" style="margin-bottom:14px;border-color:var(--accent);">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <span class="badge" style="background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);">● ACTIVE PROGRAM</span>
   </div>
-  <a href="{{ url_for('plans.new') }}" class="btn btn-primary">+ New Plan</a>
+  <div style="font-weight:700;font-size:18px;margin-bottom:4px;">{{ p.name }}</div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">{{ p.total_weeks }} weeks · Started {{ p.start_date.strftime('%b %d, %Y') if p.start_date else 'not started' }}</div>
+  <!-- Progress bar (completion-based) -->
+  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px;">
+    <span>{{ p.done_sessions }} / {{ p.total_sessions }} sessions</span>
+    <span>{{ p.total_weeks }} weeks</span>
+  </div>
+  <div style="height:4px;background:var(--surface2);border-radius:2px;margin-bottom:12px;">
+    <div style="height:4px;border-radius:2px;background:var(--accent);width:{{ p.progress_pct }}%;"></div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{{ url_for('program.week', program_id=p.id, week_num=p.comp_week) }}" class="btn btn-primary btn-sm" style="flex:1;text-align:center;">This Week</a>
+    <a href="{{ url_for('program.view', program_id=p.id) }}" class="btn btn-secondary btn-sm" style="flex:1;text-align:center;">Full Schedule</a>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<!-- ── Other Programs ── -->
+{% set inactive_programs = programs | rejectattr('is_active') | list %}
+{% if inactive_programs %}
+<div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+  OTHER PROGRAMS
+</div>
+{% for p in inactive_programs %}
+<div class="card" style="margin-bottom:10px;">
+  <div style="font-weight:700;font-size:16px;margin-bottom:2px;">{{ p.name }}</div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">{{ p.total_weeks }} weeks</div>
+  <div style="display:flex;gap:8px;">
+    <a href="{{ url_for('program.view', program_id=p.id) }}" class="btn btn-secondary btn-sm">View</a>
+    <form method="post" action="{{ url_for('program.activate', program_id=p.id) }}">
+      <button class="btn btn-primary btn-sm">Set Active</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- ── Custom Plans ── -->
+<div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.05em;color:var(--muted);margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:baseline;">
+  CUSTOM PLANS
+  <a href="{{ url_for('plans.new') }}" class="btn btn-primary btn-sm">+ New Plan</a>
 </div>
 
 {% if plans %}
@@ -18,7 +66,7 @@
         {% if plan.is_active %}
         <span class="badge" style="background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);margin-bottom:6px;">● ACTIVE</span>
         {% endif %}
-        <div style="font-weight:700;font-size:18px;margin-bottom:2px;">{{ plan.name }}</div>
+        <div style="font-weight:700;font-size:16px;margin-bottom:2px;">{{ plan.name }}</div>
         {% if plan.description %}<div style="font-size:13px;color:var(--muted);">{{ plan.description }}</div>{% endif %}
         <div style="font-size:11px;color:var(--muted);margin-top:6px;">{{ plan.days.count() }} days · Created {{ plan.created_at.strftime('%b %Y') }}</div>
       </div>
@@ -26,23 +74,21 @@
         <a href="{{ url_for('plans.view', plan_id=plan.id) }}" class="btn btn-secondary btn-sm">View</a>
         {% if not plan.is_active %}
         <form method="post" action="{{ url_for('plans.activate', plan_id=plan.id) }}">
-          <button type="submit" class="btn btn-primary btn-sm">Set Active</button>
+          <button class="btn btn-primary btn-sm">Set Active</button>
         </form>
         {% endif %}
         <form method="post" action="{{ url_for('plans.delete', plan_id=plan.id) }}"
               onsubmit="return confirm('Delete this plan?')">
-          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+          <button class="btn btn-danger btn-sm">Delete</button>
         </form>
       </div>
     </div>
   </div>
   {% endfor %}
 {% else %}
-  <div class="card" style="text-align:center;padding:40px 20px;">
-    <div style="font-size:40px;margin-bottom:12px;">📋</div>
-    <div style="font-weight:600;margin-bottom:8px;">No plans yet</div>
-    <div style="color:var(--muted);font-size:13px;margin-bottom:16px;">Create your first training plan</div>
-    <a href="{{ url_for('plans.new') }}" class="btn btn-primary">+ Create Plan</a>
+  <div class="card" style="text-align:center;padding:30px 20px;color:var(--muted);">
+    No custom plans yet. Use programs for structured training or create a custom plan.
   </div>
 {% endif %}
+
 {% endblock %}

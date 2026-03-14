@@ -76,9 +76,6 @@
   </button>
 </form>
 
-<input type="hidden" id="global-set-index" value="0"/>
-<input type="hidden" id="global-cardio-index" value="0"/>
-
 <script>
   const exercises = [
     {% for ex in exercises %}
@@ -122,14 +119,13 @@
         </select>
       </div>
 
-      <!-- History strip injected here via HTMX-style fetch -->
       <div id="history-${exIdx}" style="margin-bottom:4px;"></div>
 
       <div class="sets-row" id="sets-row-${exIdx}"
         style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;align-items:flex-end;">
       </div>
 
-      <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;font-size:13px;"
+      <button type="button" class="btn btn-secondary btn-full" style="margin-top:10px;font-size:13px;border-style:dashed;"
         onclick="addSet(${exIdx})">+ Add Set</button>
     `;
 
@@ -147,6 +143,16 @@
     const res  = await fetch(`/workouts/htmx/exercise-history?exercise_id=${exerciseId}`);
     const html = await res.text();
     container.innerHTML = html;
+
+    // Pre-fill first set weight from last session PR weight
+    const prMatch = html.match(/data-last-weight="([\d.]+)"/);
+    if (prMatch) {
+      const row = document.getElementById(`sets-row-${exIdx}`);
+      const firstWeight = row.querySelector('input[name*="[weight]"]');
+      if (firstWeight && !firstWeight.value) {
+        firstWeight.value = prMatch[1];
+      }
+    }
   }
 
   // ── Strength set card ───────────────────────────────────
@@ -155,6 +161,14 @@
     const unit   = document.getElementById('global-unit').value;
     const row    = document.getElementById(`sets-row-${exIdx}`);
     const setNum = row.children.length + 1;
+
+    // Persist weight from previous set in this block
+    let prevWeight = '';
+    if (row.children.length > 0) {
+      const lastCard = row.children[row.children.length - 1];
+      const lastWeight = lastCard.querySelector('input[name*="[weight]"]');
+      if (lastWeight) prevWeight = lastWeight.value;
+    }
 
     const card = document.createElement('div');
     card.className = 'set-card';
@@ -167,7 +181,7 @@
       <div style="margin-bottom:6px;">
         <label class="form-label" style="font-size:10px;">Weight</label>
         <input class="form-control" type="number" step="0.5" min="0"
-          name="sets[${idx}][weight]" placeholder="0"
+          name="sets[${idx}][weight]" placeholder="0" value="${prevWeight}"
           style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;"/>
       </div>
       <div style="margin-bottom:6px;">
@@ -192,14 +206,15 @@
     `;
     row.appendChild(card);
     syncExerciseToSets(exIdx);
-    card.querySelector('input[type="number"]').focus();
+    // Focus reps not weight (weight is pre-filled)
+    card.querySelector('input[name*="[reps]"]').focus();
   }
 
   // ── Inline cardio set ───────────────────────────────────
   function addCardioSet() {
     const idx = globalCardioIndex++;
     const block = document.createElement('div');
-    block.className = 'card';
+    block.className = 'card cardio-block';
     block.style.cssText = 'margin-bottom:10px;position:relative;border-color:color-mix(in srgb,var(--run) 35%,transparent);';
     block.innerHTML = `
       <button type="button" onclick="this.closest('.card').remove()"
@@ -224,7 +239,7 @@
             style="font-family:'DM Mono',monospace;"/>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
         <div>
           <label class="form-label">Time (MM:SS)</label>
           <input class="form-control" name="cardio[${idx}][duration]" placeholder="4:00"
@@ -238,6 +253,11 @@
         <div>
           <label class="form-label">Damper</label>
           <input class="form-control" type="number" min="1" max="10" name="cardio[${idx}][damper]" placeholder="4"
+            style="font-family:'DM Mono',monospace;"/>
+        </div>
+        <div>
+          <label class="form-label">RPE</label>
+          <input class="form-control" type="number" step="0.5" min="1" max="10" name="cardio[${idx}][rpe]" placeholder="—"
             style="font-family:'DM Mono',monospace;"/>
         </div>
       </div>

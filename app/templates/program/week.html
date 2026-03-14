@@ -6,18 +6,16 @@
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
   <a href="{{ url_for('program.view', program_id=program.id) }}" class="btn btn-secondary btn-sm">← Schedule</a>
   <div style="flex:1;text-align:center;">
-    {% if prev_week %}<a href="{{ url_for('program.week', program_id=program.id, week_num=prev_week) }}" class="btn btn-secondary btn-sm">‹</a>{% else %}<span style="width:32px;display:inline-block;"></span>{% endif %}
+    {% if prev_week %}<a href="{{ url_for('program.week', program_id=program.id, week_num=prev_week) }}" class="btn btn-secondary btn-sm">‹</a>{% endif %}
     <span style="font-family:'Bebas Neue',sans-serif;font-size:22px;margin:0 10px;">WEEK {{ week_num }}</span>
-    {% if next_week %}<a href="{{ url_for('program.week', program_id=program.id, week_num=next_week) }}" class="btn btn-secondary btn-sm">›</a>{% else %}<span style="width:32px;display:inline-block;"></span>{% endif %}
+    {% if next_week %}<a href="{{ url_for('program.week', program_id=program.id, week_num=next_week) }}" class="btn btn-secondary btn-sm">›</a>{% endif %}
   </div>
   <div style="width:60px;"></div>
 </div>
 
 <!-- Phase + flags -->
 {% set phase = phases.values()|list|first %}
-{% if phase %}
-<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">{{ phase.name }}</div>
-{% endif %}
+{% if phase %}<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">{{ phase.name }}</div>{% endif %}
 {% if is_taper %}
 <div style="background:color-mix(in srgb,#00e5ff 12%,transparent);border:1px solid #00e5ff;border-radius:8px;padding:8px 12px;font-size:12px;color:#00e5ff;margin-bottom:12px;">
   🏁 Taper week — reduce volume 50-70%, focus on technique and rest
@@ -27,70 +25,117 @@
   ⚡ Deload week — reduce volume and intensity 40-50%
 </div>
 {% endif %}
-
-<!-- Current week indicator -->
 {% if week_num == current_week %}
-<div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;">● Current Week</div>
+<div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);margin-bottom:12px;">● Current Week (completion-based)</div>
+{% endif %}
+{% if week_num == cal_week %}
+<div style="font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;">📅 Calendar week</div>
 {% endif %}
 
 <!-- Days -->
 {% for day in days %}
 {% set is_rest = 'Rest' in (day.name or '') %}
-{% set is_today = (week_num == current_week and day.day_number == current_day_num) %}
-<div class="card" style="margin-bottom:10px;{% if is_today %}border-color:var(--accent);{% endif %}{% if day._completed %}opacity:0.75;{% endif %}">
+{% set is_today_cal = (week_num == cal_week and day.day_number == cal_day_num) %}
+{% set is_done    = day._status in ('done', 'altered') or (day._status is none and day._completed) %}
+{% set is_skipped = day._status == 'skipped' %}
+{% set is_collapsed = is_done or is_skipped %}
+{% set status_color = status_colors.get(day._status, '') %}
 
-  <!-- Day header -->
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:{% if not is_rest %}10px{% else %}0{% endif %};">
-    <span style="font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);padding:4px 8px;border-radius:4px;color:{% if is_today %}var(--accent){% else %}var(--muted){% endif %};">
+<div class="card" style="margin-bottom:8px;
+  {% if is_today_cal and not is_collapsed %}border-color:var(--accent);{% endif %}
+  {% if is_done %}border-color:#4caf5044;{% endif %}
+  {% if is_skipped %}border-color:#ff444444;{% endif %}">
+
+  <!-- Header row — always visible -->
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="font-family:'DM Mono',monospace;font-size:11px;background:var(--surface2);padding:4px 8px;border-radius:4px;color:{% if is_today_cal and not is_collapsed %}var(--accent){% else %}var(--muted){% endif %};flex-shrink:0;">
       {{ day.day_of_week }}
     </span>
-    <div style="flex:1;">
-      <div style="font-weight:{% if is_today %}700{% else %}600{% endif %};font-size:14px;{% if is_today %}color:var(--accent);{% endif %}">
-        {{ day.name }}
-        {% if is_today %}<span style="font-size:10px;color:var(--accent);margin-left:6px;font-family:'DM Mono',monospace;">TODAY</span>{% endif %}
+
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span style="font-weight:600;font-size:14px;{% if is_collapsed %}color:var(--muted);{% endif %}">{{ day.name }}</span>
+        {% if is_today_cal and not is_collapsed %}<span style="font-size:10px;color:var(--accent);font-family:'DM Mono',monospace;">TODAY</span>{% endif %}
+        <!-- Status badge -->
+        {% if is_done %}
+          <span style="font-size:10px;font-family:'DM Mono',monospace;padding:2px 6px;border-radius:4px;background:#4caf5022;color:#4caf50;border:1px solid #4caf5044;">✓ {{ day._status|upper if day._status else 'DONE' }}</span>
+        {% elif is_skipped %}
+          <span style="font-size:10px;font-family:'DM Mono',monospace;padding:2px 6px;border-radius:4px;background:#ff444422;color:#ff4444;border:1px solid #ff444444;">✗ SKIPPED</span>
+        {% elif day._status %}
+          <span style="font-size:10px;font-family:'DM Mono',monospace;padding:2px 6px;border-radius:4px;background:{{ status_color }}22;color:{{ status_color }};border:1px solid {{ status_color }}44;">{{ day._status|upper }}</span>
+        {% endif %}
       </div>
-      {% if day._done_date %}
-      <div style="font-size:11px;color:var(--muted);margin-top:1px;">
-        Done {{ day._done_date.strftime('%b %d') }}
-        {% if day._workout_id %}· <a href="{{ url_for('workouts.view', workout_id=day._workout_id) }}" style="color:var(--accent);text-decoration:none;">View workout →</a>{% endif %}
+
+      {% if is_collapsed %}
+      <!-- Collapsed meta row: date + view link + edit + undo -->
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap;">
+        {% if day._done_date %}<span style="font-size:11px;color:var(--muted);">{{ day._done_date.strftime('%b %d') }}</span>{% endif %}
+        {% if day._workout_id %}
+          <a href="{{ url_for('workouts.view', workout_id=day._workout_id) }}" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);">View workout</a>
+        {% endif %}
+        {% if not is_rest %}
+          <a href="{{ url_for('program.edit_day', day_id=day.id) }}" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;">Edit</a>
+          <form method="post" action="{{ url_for('program.set_status', day_id=day.id) }}" style="display:inline;">
+            <input type="hidden" name="status" value="delayed"/>
+            <button class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;">Undo</button>
+          </form>
+        {% endif %}
       </div>
       {% endif %}
     </div>
-    <!-- Complete / tick button -->
-    {% if not is_rest %}
-    {% if day._completed %}
-    <form method="post" action="{{ url_for('program.uncomplete_day', day_id=day.id) }}">
-      <button class="btn btn-secondary btn-sm" style="color:#4caf50;border-color:#4caf50;min-width:36px;">✓</button>
-    </form>
-    {% else %}
-    <form method="post" action="{{ url_for('program.complete_day', day_id=day.id) }}">
-      <button class="btn btn-secondary btn-sm" style="min-width:36px;">○</button>
-    </form>
-    {% endif %}
-    {% endif %}
   </div>
 
-  <!-- Exercise list (collapsed for rest days) -->
-  {% if not is_rest and day._exercises %}
-  <div style="padding-top:8px;border-top:1px solid var(--border);">
-    {% for ex in day._exercises %}
-    <div style="font-size:13px;color:{% if loop.index == 1 %}var(--text){% else %}var(--muted){% endif %};padding:3px 0;display:flex;gap:8px;align-items:baseline;">
-      <span style="color:var(--accent);font-size:10px;font-family:'DM Mono',monospace;flex-shrink:0;">{{ loop.index }}</span>
-      <span>{{ ex }}</span>
+  <!-- Expanded body — only shown when not collapsed -->
+  {% if not is_rest and not is_collapsed %}
+  <div style="margin-top:10px;">
+    {% if day._exercises %}
+    <div style="padding-top:8px;border-top:1px solid var(--border);margin-bottom:10px;">
+      {% for ex in day._exercises %}
+      <div style="font-size:13px;color:{% if loop.index == 1 %}var(--text){% else %}var(--muted){% endif %};padding:2px 0;display:flex;gap:8px;align-items:baseline;">
+        <span style="color:var(--accent);font-size:10px;font-family:'DM Mono',monospace;flex-shrink:0;min-width:14px;">{{ loop.index }}</span>
+        <span>{{ ex }}</span>
+      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+    {% endif %}
+
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <a href="{{ url_for('program.start_day', day_id=day.id) }}"
+         class="btn btn-primary btn-sm" style="flex:1;text-align:center;min-width:100px;">
+        ▶ Start
+      </a>
+      <a href="{{ url_for('program.edit_day', day_id=day.id) }}" class="btn btn-secondary btn-sm" style="padding:6px 10px;">✎</a>
+      <button onclick="toggleStatus({{ day.id }})" class="btn btn-secondary btn-sm" style="padding:6px 10px;">···</button>
+    </div>
+
+    <div id="status-panel-{{ day.id }}" style="display:none;gap:6px;flex-wrap:wrap;margin-top:8px;">
+      {% for st, color in status_colors.items() %}
+      <form method="post" action="{{ url_for('program.set_status', day_id=day.id) }}" style="display:inline;">
+        <input type="hidden" name="status" value="{{ st }}"/>
+        <button class="btn btn-sm" style="background:{{ color }}22;color:{{ color }};border:1px solid {{ color }}44;padding:6px 10px;">
+          {% if st == 'done' %}✓ Done{% else %}{{ st|title }}{% endif %}
+        </button>
+      </form>
+      {% endfor %}
+    </div>
   </div>
   {% endif %}
 
 </div>
 {% endfor %}
 
-<!-- Week completion summary -->
-{% set done = days | selectattr('_completed') | list | length %}
-{% set total = days | rejectattr('name', 'in', ['Rest or Active Recovery']) | list | length %}
+<!-- Week summary -->
 <div class="card" style="text-align:center;margin-top:4px;">
   <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:{% if done == total %}#4caf50{% else %}var(--accent){% endif %};">{{ done }} / {{ total }}</div>
-  <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">Sessions Complete</div>
+  <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;">Sessions Complete This Week</div>
 </div>
 
+{% endblock %}
+{% block scripts %}
+<script>
+function toggleStatus(dayId) {
+  const panel = document.getElementById('status-panel-' + dayId);
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+}
+</script>
 {% endblock %}

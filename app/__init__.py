@@ -43,6 +43,29 @@ def create_app():
     db.init_app(app)
 
     from .routes.main import main_bp
+
+    @app.context_processor
+    def inject_today_program():
+        """Make today_program_day available in all templates for the log modal."""
+        from .models import Program, ProgramDay
+        from datetime import date
+        try:
+            prog = Program.query.filter_by(is_active=True).first()
+            if prog and prog.start_date:
+                delta    = (date.today() - prog.start_date).days
+                week_num = min((delta // 7) + 1, prog.total_weeks)
+                day_num  = (delta % 7) + 1
+                today_pd = ProgramDay.query.filter_by(
+                    program_id=prog.id, week_number=week_num, day_number=day_num
+                ).first()
+                if today_pd:
+                    today_pd._week = week_num
+                return dict(today_program=prog, today_program_day=today_pd)
+        except Exception:
+            pass
+        return dict(today_program=None, today_program_day=None)
+
+
     from .routes.workouts  import workouts_bp
     from .routes.progress  import progress_bp
     from .routes.plans import plans_bp

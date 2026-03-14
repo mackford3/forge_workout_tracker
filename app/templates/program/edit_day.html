@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Edit — {{ day.name }}{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="{{ url_for('program.week', program_id=day.program_id, week_num=day.week_number) }}" class="btn btn-secondary btn-sm">← Back</a>
+  <h1 style="font-size:26px;margin:0;">Edit Day</h1>
+</div>
+
+<div style="font-size:12px;color:var(--muted);margin-bottom:16px;">
+  Week {{ day.week_number }} · {{ day.day_of_week }}
+</div>
+
+<form method="post">
+  <div class="card" style="margin-bottom:12px;">
+    <div class="form-group">
+      <label class="form-label">Workout Name</label>
+      <input class="form-control" name="name" value="{{ day.name or '' }}" required/>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Notes</label>
+      <input class="form-control" name="notes" value="{{ day.notes or '' }}" placeholder="Optional notes"/>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px;">
+    <label class="form-label">Exercises (one per line)</label>
+    <textarea class="form-control" name="exercises" rows="12"
+      placeholder="Back Squat 4x8-10&#10;Romanian Deadlift 4x8-10&#10;..."
+      style="font-family:'DM Mono',monospace;font-size:13px;line-height:1.6;">{{ ex_list | join('\n') }}</textarea>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+      Format: exercise name + sets/reps. Example: "Back Squat 4x8-10"
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary btn-full" style="font-size:16px;padding:14px;">
+    Save Changes ✓
+  </button>
+</form>
+{% endblock %}

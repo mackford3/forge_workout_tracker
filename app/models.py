@@ -88,6 +88,7 @@ class CardioSet(db.Model):
     calories     = db.Column(db.Integer)
     avg_bpm      = db.Column(db.Integer)
     damper       = db.Column(db.Integer)
+    rpe          = db.Column(db.Numeric(3, 1))
     notes        = db.Column(db.Text)
 
 
@@ -239,17 +240,18 @@ class ProgramPhase(db.Model):
 
 class ProgramDay(db.Model):
     __tablename__ = 'program_days'
-    id          = db.Column(db.Integer, primary_key=True)
-    program_id  = db.Column(db.Integer, db.ForeignKey('programs.id'), nullable=False)
-    phase_id    = db.Column(db.Integer, db.ForeignKey('program_phases.id'))
-    week_number = db.Column(db.Integer, nullable=False)
-    day_of_week = db.Column(db.String(10), nullable=False)
-    day_number  = db.Column(db.Integer, nullable=False)
-    name        = db.Column(db.String(150))
-    exercises   = db.Column(db.Text)   # JSON array string
-    notes       = db.Column(db.Text)
-    completions = db.relationship('ProgramCompletion', backref='day', lazy='dynamic',
-                                  cascade='all, delete-orphan')
+    id              = db.Column(db.Integer, primary_key=True)
+    program_id      = db.Column(db.Integer, db.ForeignKey('programs.id'), nullable=False)
+    phase_id        = db.Column(db.Integer, db.ForeignKey('program_phases.id'))
+    week_number     = db.Column(db.Integer, nullable=False)
+    day_of_week     = db.Column(db.String(10), nullable=False)
+    day_number      = db.Column(db.Integer, nullable=False)
+    sequence_number = db.Column(db.Integer)  # global order for delay shifting
+    name            = db.Column(db.String(150))
+    exercises       = db.Column(db.Text)   # JSON array string
+    notes           = db.Column(db.Text)
+    completions     = db.relationship('ProgramCompletion', backref='day', lazy='dynamic',
+                                      cascade='all, delete-orphan')
 
 
 class ProgramCompletion(db.Model):
@@ -258,6 +260,11 @@ class ProgramCompletion(db.Model):
     day_id     = db.Column(db.Integer, db.ForeignKey('program_days.id'), nullable=False)
     workout_id = db.Column(db.Integer, db.ForeignKey('workouts.id'), nullable=True)
     completed  = db.Column(db.Boolean, default=False)
+    status     = db.Column(db.String(20), default='done')  # done/skipped/altered/delayed
     done_date  = db.Column(db.Date)
+    skipped_at = db.Column(db.Date)
     notes      = db.Column(db.Text)
     workout    = db.relationship('Workout')
+
+# Status options
+COMPLETION_STATUSES = ['done', 'skipped', 'altered', 'delayed']
