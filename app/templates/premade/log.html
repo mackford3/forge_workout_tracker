@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Log — {{ pw.name }}{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="{{ url_for('premade.view', pw_id=pw.id) }}" class="btn btn-secondary btn-sm">← Cancel</a>
+  <h1 style="font-size:26px;margin:0;">{{ pw.name }}</h1>
+</div>
+
+<form method="post">
+  <!-- Session info -->
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Location</label>
+        <select class="form-control" name="location">
+          <option value="gym">🏋️ Gym</option>
+          <option value="home">🏠 Home</option>
+          <option value="outdoor">🌳 Outdoor</option>
+          <option value="other">📍 Other</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Date & Time</label>
+        <input class="form-control" type="datetime-local" name="completed_at"/>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Duration (min)</label>
+        <input class="form-control" type="number" name="duration_minutes" placeholder="45"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Calories</label>
+        <input class="form-control" type="number" name="calories" placeholder="500"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Avg BPM</label>
+        <input class="form-control" type="number" name="avg_bpm" placeholder="160"/>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Total Time (MM:SS)</label>
+      <input class="form-control" id="total-time-input" name="total_time" placeholder="33:27"
+             style="font-family:'DM Mono',monospace;font-size:20px;font-weight:700;text-align:center;"/>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Leave blank to auto-sum station times</div>
+    </div>
+  </div>
+
+  <!-- Did not finish toggle -->
+  <div class="card card-sm" style="margin-bottom:10px;display:flex;align-items:center;gap:12px;">
+    <input type="checkbox" id="incomplete" name="incomplete" style="width:18px;height:18px;cursor:pointer;"/>
+    <label for="incomplete" style="font-size:14px;cursor:pointer;">Did Not Finish (DNF)</label>
+  </div>
+
+  <!-- Stations -->
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.05em;color:var(--muted);margin-bottom:10px;">STATIONS</div>
+
+  {% for s in stations %}
+  <div class="card" style="margin-bottom:8px;" id="station-card-{{ s.id }}">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);min-width:28px;">{{ s.station_order }}</span>
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:15px;">{{ s.name }}</div>
+        {% if s.target_reps or s.target_distance_m or s.target_weight_lbs %}
+        <div style="font-size:11px;color:var(--muted);">
+          Target:
+          {% if s.target_reps %}{{ s.target_reps }} reps{% endif %}
+          {% if s.target_distance_m %}{{ s.target_distance_m|int }}m{% endif %}
+          {% if s.target_weight_lbs %}@ {{ s.target_weight_lbs|int }}lbs{% endif %}
+        </div>
+        {% endif %}
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;">
+        <input type="checkbox" name="station_{{ s.id }}_skip" onchange="toggleStation({{ s.id }}, this.checked)"/>
+        Skip
+      </label>
+    </div>
+
+    <div id="station-fields-{{ s.id }}" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <div>
+        <label class="form-label">Time (MM:SS)</label>
+        <input class="form-control station-time" id="time-{{ s.id }}"
+               name="station_{{ s.id }}_time" placeholder="0:00"
+               style="font-family:'DM Mono',monospace;"
+               oninput="updateTotal()"/>
+      </div>
+      {% if s.target_reps %}
+      <div>
+        <label class="form-label">Reps Done</label>
+        <input class="form-control" type="number" name="station_{{ s.id }}_reps"
+               placeholder="{{ s.target_reps }}" style="font-family:'DM Mono',monospace;"/>
+      </div>
+      {% else %}
+      <div></div>
+      {% endif %}
+      <div>
+        <label class="form-label">Effort (1–10)</label>
+        <input class="form-control" type="number" step="0.5" min="1" max="10"
+               name="station_{{ s.id }}_effort" placeholder="—"
+               style="font-family:'DM Mono',monospace;"/>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="form-group" style="margin-top:10px;">
+    <label class="form-label">Notes</label>
+    <textarea class="form-control" name="notes" rows="2" placeholder="How did it go?"></textarea>
+  </div>
+
+  <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;margin-top:8px;">
+    Save Attempt ✓
+  </button>
+</form>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function parseTime(val) {
+  if (!val || !val.trim()) return 0;
+  const parts = val.trim().split(':');
+  if (parts.length === 2) return parseInt(parts[0]||0)*60 + parseInt(parts[1]||0);
+  if (parts.length === 3) return parseInt(parts[0]||0)*3600 + parseInt(parts[1]||0)*60 + parseInt(parts[2]||0);
+  return 0;
+}
+
+function fmtTime(s) {
+  const m = Math.floor(s/60), sec = s%60;
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+function updateTotal() {
+  const inputs = document.querySelectorAll('.station-time');
+  let total = 0;
+  inputs.forEach(inp => {
+    if (!inp.closest('[id^="station-card-"]').querySelector('input[type="checkbox"]').checked) {
+      total += parseTime(inp.value);
+    }
+  });
+  const totalInput = document.getElementById('total-time-input');
+  if (total > 0 && !totalInput.value) {
+    totalInput.placeholder = fmtTime(total) + ' (auto)';
+  }
+}
+
+function toggleStation(stationId, skipped) {
+  document.getElementById('station-fields-' + stationId).style.opacity = skipped ? '0.4' : '1';
+  document.getElementById('station-fields-' + stationId).style.pointerEvents = skipped ? 'none' : '';
+  updateTotal();
+}
+</script>
+{% endblock %}

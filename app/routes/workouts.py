@@ -51,7 +51,22 @@ def view(workout_id):
             if max_w:
                 pr_map[ex_id] = float(max_w)
 
-    return render_template('workouts/view.html', workout=workout, pr_map=pr_map)
+    # Check for linked premade result (benchmark workout)
+    premade_result = None
+    try:
+        from ..models import PremadeResult, PremadeStation
+        pr = PremadeResult.query.filter_by(workout_id=workout_id).first()
+        if pr:
+            station_results = {sr.station_id: sr for sr in pr.station_results.all()}
+            stations = pr.premade_workout.stations.all()
+            pr._station_results = station_results
+            pr._stations = stations
+            premade_result = pr
+    except Exception:
+        pass
+
+    return render_template('workouts/view.html', workout=workout, pr_map=pr_map,
+                           premade_result=premade_result)
 
 
 # ── Delete ─────────────────────────────────────────────────
@@ -120,11 +135,18 @@ def log_strength():
         ))
         has_cardio = len(cardio_indices) > 0
         for j in cardio_indices:
+            machine = f[f'cardio[{j}][machine]']
+            # outdoor_bike uses distance_km; others use distance_m
+            dist_m = None
+            if f.get(f'cardio[{j}][distance_m]'):
+                dist_m = int(float(f[f'cardio[{j}][distance_m]']))
+            elif f.get(f'cardio[{j}][distance_km]'):
+                dist_m = int(float(f[f'cardio[{j}][distance_km]']) * 1000)
             db.session.add(CardioSet(
                 workout_id   = workout.id,
-                machine      = f[f'cardio[{j}][machine]'],
+                machine      = machine,
                 set_number   = j + 1,
-                distance_m   = int(f[f'cardio[{j}][distance_m]']) if f.get(f'cardio[{j}][distance_m]') else None,
+                distance_m   = dist_m,
                 duration_s   = _time_to_seconds(f.get(f'cardio[{j}][duration]')),
                 calories     = int(f[f'cardio[{j}][calories]'])   if f.get(f'cardio[{j}][calories]')   else None,
                 damper       = int(f[f'cardio[{j}][damper]'])     if f.get(f'cardio[{j}][damper]')     else None,
@@ -515,11 +537,17 @@ def edit(workout_id):
             ))
             has_cardio = len(cardio_indices) > 0
             for j in cardio_indices:
+                machine = f[f'cardio[{j}][machine]']
+                dist_m = None
+                if f.get(f'cardio[{j}][distance_m]'):
+                    dist_m = int(float(f[f'cardio[{j}][distance_m]']))
+                elif f.get(f'cardio[{j}][distance_km]'):
+                    dist_m = int(float(f[f'cardio[{j}][distance_km]']) * 1000)
                 db.session.add(CardioSet(
                     workout_id   = workout.id,
-                    machine      = f[f'cardio[{j}][machine]'],
+                    machine      = machine,
                     set_number   = j + 1,
-                    distance_m   = int(f[f'cardio[{j}][distance_m]']) if f.get(f'cardio[{j}][distance_m]') else None,
+                    distance_m   = dist_m,
                     duration_s   = _time_to_seconds(f.get(f'cardio[{j}][duration]')),
                     calories     = int(f[f'cardio[{j}][calories]'])   if f.get(f'cardio[{j}][calories]')   else None,
                     damper       = int(f[f'cardio[{j}][damper]'])     if f.get(f'cardio[{j}][damper]')     else None,

@@ -71,6 +71,7 @@ def create_app():
     from .routes.plans import plans_bp
     from .routes.program import program_bp
     from .routes.exercises import exercises_bp
+    from .routes.premade import premade_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(workouts_bp,  url_prefix='/workouts')
@@ -78,6 +79,7 @@ def create_app():
     app.register_blueprint(plans_bp, url_prefix='/plans')
     app.register_blueprint(program_bp, url_prefix='/program')
     app.register_blueprint(exercises_bp, url_prefix='/exercises')
+    app.register_blueprint(premade_bp, url_prefix='/benchmarks')
 
     @app.context_processor
     def inject_globals():

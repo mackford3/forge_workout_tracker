@@ -371,6 +371,60 @@
   {% endfor %}
 {% endif %}
 
+<!-- Premade / Benchmark result -->
+{% if premade_result %}
+<div class="card" style="margin-bottom:10px;border-color:var(--hyrox);">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--hyrox);">
+      🏁 {{ premade_result.premade_workout.name }}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      {% if not premade_result.completed %}
+      <span style="font-size:10px;font-family:'DM Mono',monospace;background:#ff444422;color:#ff4444;border:1px solid #ff444444;padding:2px 6px;border-radius:4px;">DNF</span>
+      {% endif %}
+      {% if premade_result.total_time_s %}
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--hyrox);">
+        {{ premade_result.total_time_s // 60 }}:{{ '%02d' % (premade_result.total_time_s % 60) }}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% for s in premade_result._stations %}
+  {% set sr = premade_result._station_results.get(s.id) %}
+  <div style="display:flex;align-items:center;gap:10px;padding:8px 0;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}">
+    <span style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--accent);min-width:22px;">{{ s.station_order }}</span>
+    <span style="flex:1;font-size:13px;{% if sr and sr.skipped %}color:var(--muted);{% endif %}">{{ s.name }}</span>
+    {% if sr %}
+      {% if sr.skipped %}
+        <span style="font-size:11px;color:#ff4444;">skipped</span>
+      {% else %}
+        {% if sr.time_s %}
+        <span style="font-family:'DM Mono',monospace;font-size:14px;font-weight:600;color:var(--hyrox);">
+          {{ sr.time_s // 60 }}:{{ '%02d' % (sr.time_s % 60) }}
+        </span>
+        {% endif %}
+        {% if sr.reps_completed and s.target_reps and sr.reps_completed < s.target_reps %}
+        <span style="font-size:11px;color:#ff9800;">{{ sr.reps_completed }}/{{ s.target_reps }} reps</span>
+        {% elif sr.reps_completed %}
+        <span style="font-size:11px;color:var(--muted);">{{ sr.reps_completed }} reps</span>
+        {% endif %}
+        {% if sr.effort %}
+        <span style="font-size:11px;color:var(--muted);">E{{ sr.effort|float|int }}</span>
+        {% endif %}
+      {% endif %}
+    {% else %}
+    <span style="font-size:11px;color:var(--muted);">—</span>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  {% if premade_result.notes %}
+  <p style="font-size:12px;color:var(--muted);margin-top:10px;font-style:italic;">{{ premade_result.notes }}</p>
+  {% endif %}
+</div>
+{% endif %}
+
 <!-- Notes -->
 {% if workout.notes %}
 <div class="card" style="margin-bottom:10px;">

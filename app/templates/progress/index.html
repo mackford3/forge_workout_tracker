@@ -8,8 +8,9 @@
 
 <!-- Tabs -->
 <div class="pill-tabs" style="margin-bottom:16px;">
-  <a class="pill active" id="tab-strength" onclick="switchTab('strength')" href="#">Strength</a>
-  <a class="pill"        id="tab-runs"     onclick="switchTab('runs')"     href="#">Runs</a>
+  <a class="pill active" id="tab-strength"    onclick="switchTab('strength')"    href="#">Strength</a>
+  <a class="pill"        id="tab-runs"        onclick="switchTab('runs')"        href="#">Runs</a>
+  <a class="pill"        id="tab-benchmarks"  onclick="switchTab('benchmarks')"  href="#">Benchmarks</a>
 </div>
 
 <!-- ── STRENGTH TAB ── -->
@@ -55,6 +56,43 @@
   <div id="strength-loading" style="display:none;text-align:center;padding:40px;color:var(--muted);">Loading...</div>
 </div>
 
+<!-- ── BENCHMARKS TAB ── -->
+<div id="pane-benchmarks" style="display:none;">
+  {% if premade_workouts %}
+  <div class="card" style="margin-bottom:12px;">
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Select Benchmark</label>
+      <select id="benchmark-select" class="form-control" onchange="loadBenchmarkChart(this.value)">
+        <option value="">Choose a benchmark...</option>
+        {% for pw in premade_workouts %}
+        <option value="{{ pw.id }}">{{ pw.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="text-align:center;padding:32px;color:var(--muted);margin-bottom:12px;">
+    No benchmark workouts defined yet.
+  </div>
+  {% endif %}
+
+  <!-- These divs always exist so JS never gets a null reference -->
+  <div id="benchmark-chart-container" style="display:none;">
+    <div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;">
+        <div id="benchmark-chart-title" style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--hyrox);"></div>
+        <div id="benchmark-chart-best"  style="font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);"></div>
+      </div>
+      <canvas id="benchmark-chart" style="width:100%;max-height:260px;"></canvas>
+    </div>
+    <div id="benchmark-session-list"></div>
+  </div>
+  <div id="benchmark-empty"   style="display:none;" class="card">
+    <div style="text-align:center;padding:20px;color:var(--muted);">No attempts logged yet.</div>
+  </div>
+  <div id="benchmark-loading" style="display:none;text-align:center;padding:40px;color:var(--muted);">Loading...</div>
+</div>
+
 <!-- ── RUNS TAB ── -->
 <div id="pane-runs" style="display:none;">
   <div class="pill-tabs" style="margin-bottom:12px;">
@@ -95,7 +133,7 @@ let activeTab     = 'strength';
 // ── Tab switching ────────────────────────────────────────
 function switchTab(tab) {
   activeTab = tab;
-  ['strength','runs'].forEach(t => {
+  ['strength','runs','benchmarks'].forEach(t => {
     document.getElementById(`pane-${t}`).style.display   = t === tab ? '' : 'none';
     document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
   });
@@ -305,6 +343,96 @@ function buildLineChart(canvasId, labels, values, pointColors, lineColor, unitLa
         }
       }
     }
+  });
+}
+
+// ── Benchmark chart ─────────────────────────────────────
+let benchmarkChart = null;
+
+async function loadBenchmarkChart(pwId) {
+  if (!pwId) return;
+  document.getElementById('benchmark-chart-container').style.display = 'none';
+  document.getElementById('benchmark-empty').style.display            = 'none';
+  document.getElementById('benchmark-loading').style.display          = 'block';
+
+  const res  = await fetch(`/benchmarks/data/${pwId}`);
+  const data = await res.json();
+  document.getElementById('benchmark-loading').style.display = 'none';
+
+  if (!data.length) { document.getElementById('benchmark-empty').style.display = 'block'; return; }
+
+  const title   = document.getElementById('benchmark-select').selectedOptions[0].text;
+  const labels  = data.map(d => fmtDate(d.date));
+  const times   = data.map(d => d.total_s);
+  const bestS   = Math.min(...times.filter(Boolean));
+  const bestFmt = data.find(d => d.total_s === bestS)?.total_fmt || '';
+
+  document.getElementById('benchmark-chart-title').textContent = title;
+  document.getElementById('benchmark-chart-best').textContent  = `Best: ${bestFmt}`;
+  document.getElementById('benchmark-chart-container').style.display = 'block';
+
+  const pointColors = times.map(t => t === bestS ? '#e8ff00' : '#ff4d00');
+  if (benchmarkChart) benchmarkChart.destroy();
+
+  const ctx = document.getElementById('benchmark-chart').getContext('2d');
+  benchmarkChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: times,
+        borderColor: '#ff4d00',
+        backgroundColor: 'rgba(255,77,0,0.08)',
+        pointBackgroundColor: pointColors,
+        pointRadius: 5,
+        tension: 0.3,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const d = data[ctx.dataIndex];
+              return ` ${d.total_fmt}${d.completed ? '' : ' (DNF)'}`;
+            }
+          },
+          backgroundColor: '#1a1a1a', borderColor: '#2a2a2a', borderWidth: 1,
+          titleColor: '#ff4d00', bodyColor: '#f0f0f0', padding: 12,
+        }
+      },
+      scales: {
+        x: { grid: { color: '#1a1a1a' }, ticks: { color: '#666', font: { family: 'DM Mono', size: 11 } } },
+        y: {
+          reverse: true,
+          grid: { color: '#1a1a1a' },
+          ticks: {
+            color: '#666', font: { family: 'DM Mono', size: 11 },
+            callback: v => { const m=Math.floor(v/60),s=v%60; return `${m}:${String(s).padStart(2,'0')}`; }
+          }
+        }
+      }
+    }
+  });
+
+  // Session list
+  const list = document.getElementById('benchmark-session-list');
+  list.innerHTML = '';
+  [...data].reverse().forEach(d => {
+    const isBest = d.total_s === bestS;
+    const bestBadge = isBest ? `<span style="font-family:monospace;font-size:10px;background:#e8ff00;color:#000;padding:2px 6px;border-radius:4px;">BEST</span>` : '';
+    const dnfBadge  = !d.completed ? `<span style="font-family:monospace;font-size:10px;background:#ff444422;color:#ff4444;border:1px solid #ff444444;padding:2px 6px;border-radius:4px;">DNF</span>` : '';
+    list.innerHTML += `<a href="/workouts/${d.workout_id}" style="display:block;text-decoration:none;color:var(--text);">
+      <div class="card card-sm" style="margin-bottom:8px;${isBest ? 'border-color:#e8ff00;' : ''}">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:13px;color:var(--muted);">${fmtDateLong(d.date)}</span>
+          ${bestBadge}${dnfBadge}
+          <span style="margin-left:auto;font-family:monospace;font-size:18px;font-weight:700;color:var(--hyrox);">${d.total_fmt}</span>
+        </div>
+      </div></a>`;
   });
 }
 
