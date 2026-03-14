@@ -1,5 +1,6 @@
 {% if last_sets %}
-<div class="ex-history-strip" style="
+{% set last_weight = last_sets[0].weight_lbs | int if last_sets and last_sets[0].weight_lbs else 0 %}
+<div class="ex-history-strip" data-last-weight="{{ last_weight }}" style="
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 8px;

@@ -7,18 +7,20 @@
   <h1 style="font-size:22px;margin:0;flex:1;">{{ program.name }}</h1>
 </div>
 
-<!-- Overall progress -->
+<!-- Overall progress — based on completions not calendar -->
 <div class="card" style="margin-bottom:14px;">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-    <span style="font-size:12px;color:var(--muted);">Overall Progress</span>
-    <span style="font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);">Week {{ current_week }} / {{ program.total_weeks }}</span>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+    <span style="font-size:12px;color:var(--muted);">Progress (by completion)</span>
+    <span style="font-family:'DM Mono',monospace;font-size:13px;color:var(--accent);">{{ done_count }} / {{ total_count }} sessions</span>
   </div>
-  <div style="height:6px;background:var(--surface2);border-radius:3px;">
-    <div style="height:6px;border-radius:3px;background:var(--accent);width:{{ ((current_week-1)/program.total_weeks*100)|int }}%;transition:width 0.3s;"></div>
+  <div style="height:6px;background:var(--surface2);border-radius:3px;margin-bottom:6px;">
+    {% set pct = ((done_count / total_count * 100)|int) if total_count > 0 else 0 %}
+    <div style="height:6px;border-radius:3px;background:var(--accent);width:{{ pct }}%;transition:width 0.3s;"></div>
   </div>
-  {% if program.start_date %}
-  <div style="font-size:11px;color:var(--muted);margin-top:6px;">Started {{ program.start_date.strftime('%B %d, %Y') }}</div>
-  {% endif %}
+  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);">
+    <span>Current week: {{ current_week }}</span>
+    {% if program.start_date %}<span>Started {{ program.start_date.strftime('%b %d, %Y') }}</span>{% endif %}
+  </div>
 </div>
 
 <!-- Phase list — click to jump to week -->
@@ -37,7 +39,9 @@
     {% set is_current = week_num == current_week %}
     {% set is_deload  = week_num in [4,8,12,16,20] %}
     {% set is_taper   = week_num in [23,24] %}
-    {% set all_done   = done_count >= active_count and active_count > 0 %}
+    {% set done_days  = days | selectattr('_completed') | list | length %}
+    {% set all_done   = done_days >= active_count and active_count > 0 %}
+    {% set has_skip   = days | selectattr('_status', 'equalto', 'skipped') | list | length > 0 %}
     <a href="{{ url_for('program.week', program_id=program.id, week_num=week_num) }}"
        style="display:flex;flex-direction:column;align-items:center;padding:8px 10px;border-radius:8px;border:{{ '2px solid var(--accent)' if is_current else '1px solid var(--border)' }};background:{{ 'color-mix(in srgb,var(--accent) 12%,transparent)' if all_done else 'var(--surface)' }};text-decoration:none;min-width:48px;transition:border-color 0.15s;">
       <span style="font-family:'Bebas Neue',sans-serif;font-size:18px;line-height:1;color:{{ 'var(--accent)' if is_current else 'var(--text)' }};">{{ week_num }}</span>
@@ -45,7 +49,7 @@
         {% if is_taper %}TAPER
         {% elif is_deload %}DELOAD
         {% elif all_done %}✓ DONE
-        {% else %}{{ done_count }}/{{ active_count }}{% endif %}
+        {% else %}{{ done_days }}/{{ active_count }}{% endif %}
       </span>
     </a>
     {% endfor %}

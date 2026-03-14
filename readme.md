@@ -196,8 +196,9 @@ All tables live in the `forge` schema inside the `forge_workouts` database.
 
 ## Future Features
 
+- [ ] **Create custom program** — UI to build a new structured program from scratch with options for: program length (weeks), goal selection (strength, endurance, hyrox, general fitness), days per week, phase structure, and deload weeks. Currently programs must be added via SQL.
+- [ ] **Create custom plan** — A plan is a shorter, lighter version of a program — a repeating weekly split (e.g. "Push/Pull/Legs 3x/week") without phases or progression tracking. Build it in the Plans tab and optionally set it active to see it in the log modal.
 - [ ] **Garmin sync** — Import `.fit` files via `fitparse` + `garminconnect` Python libraries. Would auto-populate run sessions with HR, pace splits, and GPS data from Garmin Connect without manual entry.
 - [ ] **Workout templates** — Save a logged workout as a reusable template, then start a new session pre-filled with the same exercises and sets. Big gym QoL improvement.
-- [ ] **Plan scheduling** — Link logged workouts back to specific plan days to track adherence vs. plan.
 - [ ] **Hyrox race comparison** — Side-by-side station breakdown across multiple races to track splits over time.
 - [ ] **Unraid Docker template** — One-click install via Unraid Community Applications.

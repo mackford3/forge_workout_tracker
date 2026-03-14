@@ -67,6 +67,10 @@
   </div>
   {% endfor %}
   <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);">
+    <div style="width:10px;height:10px;border-radius:2px;background:linear-gradient(90deg,#e8ff00 50%,#00e5ff 50%);opacity:0.8;"></div>
+    mixed
+  </div>
+  <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);">
     <div style="width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);"></div>
     today
   </div>
@@ -89,7 +93,7 @@
   {% set workouts_today = day_map.get(day, []) %}
   {% set is_today = (today.year == year and today.month == month and today.day == day) %}
   {% set has_workouts = workouts_today|length > 0 %}
-  {% set type_colors = {'strength':'#e8ff00','run':'#00e5ff','hyrox':'#ff4d00','circuit':'#b44dff','amrap':'#ff006e'} %}
+  {% set type_colors = {'strength':'#e8ff00','run':'#00e5ff','hyrox':'#ff4d00','circuit':'#b44dff','amrap':'#ff006e','strength+cardio':'#e8ff00'} %}
   {% set types = workouts_today | map(attribute='workout_type') | list %}
 
   <div style="
@@ -111,7 +115,11 @@
     {% if has_workouts %}
     <div style="position:absolute;bottom:0;left:0;right:0;height:4px;display:flex;gap:1px;">
       {% for w in workouts_today %}
-      <div style="flex:1;background:{{ type_colors.get(w.workout_type, '#666') }};opacity:0.9;"></div>
+        {% if w.workout_type == 'strength+cardio' %}
+        <div style="flex:1;background:linear-gradient(90deg,#e8ff00 50%,#00e5ff 50%);opacity:0.9;"></div>
+        {% else %}
+        <div style="flex:1;background:{{ type_colors.get(w.workout_type, '#666') }};opacity:0.9;"></div>
+        {% endif %}
       {% endfor %}
     </div>
     {% endif %}
@@ -125,7 +133,12 @@
       {% endfor %}
     </div>
     {% elif has_workouts %}
-    <div style="width:5px;height:5px;border-radius:50%;background:{{ type_colors.get(workouts_today[0].workout_type,'#666') }};margin-top:1px;"></div>
+    {% set wt = workouts_today[0].workout_type %}
+    {% if wt == 'strength+cardio' %}
+    <div style="width:5px;height:5px;border-radius:50%;background:linear-gradient(135deg,#e8ff00 50%,#00e5ff 50%);margin-top:1px;"></div>
+    {% else %}
+    <div style="width:5px;height:5px;border-radius:50%;background:{{ type_colors.get(wt,'#666') }};margin-top:1px;"></div>
+    {% endif %}
     {% endif %}
 
   </div>
@@ -143,11 +156,11 @@
     <div style="min-width:28px;text-align:center;">
       <span style="font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1;color:var(--muted);">{{ day }}</span>
     </div>
-    <div style="width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;background:{{ {'strength':'#e8ff00','run':'#00e5ff','hyrox':'#ff4d00','circuit':'#b44dff','amrap':'#ff006e'}.get(w.workout_type,'#666') }};"></div>
+    <div style="width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;{% if w.workout_type == 'strength+cardio' %}background:linear-gradient(180deg,#e8ff00 50%,#00e5ff 50%){% else %}background:{{ {'strength':'#e8ff00','run':'#00e5ff','hyrox':'#ff4d00','circuit':'#b44dff','amrap':'#ff006e'}.get(w.workout_type,'#666') }}{% endif %};"></div>
     <div class="wr-info">
       <div class="wr-name">{{ w.name }}</div>
       <div class="wr-meta">
-        <span class="badge badge-{{ w.workout_type }}" style="font-size:9px;padding:1px 5px;">{{ w.workout_type }}</span>
+        {% if w.workout_type == "strength+cardio" %}<span class="badge badge-strength" style="font-size:9px;padding:1px 4px;">str</span><span class="badge badge-run" style="font-size:9px;padding:1px 4px;margin-left:2px;">crd</span>{% else %}<span class="badge badge-{{ w.workout_type }}" style="font-size:9px;padding:1px 5px;">{{ w.workout_type }}</span>{% endif %}
         {% if w.duration_minutes %} · {{ w.duration_minutes }}min{% endif %}
         {% if w.calories %} · {{ w.calories }}cal{% endif %}
       </div>

@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for
+from datetime import date
 from ..models import db, WorkoutPlan, PlanDay
 
 plans_bp = Blueprint('plans', __name__)
@@ -9,7 +10,23 @@ DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 @plans_bp.route('/')
 def index():
     plans = WorkoutPlan.query.order_by(WorkoutPlan.created_at.desc()).all()
-    return render_template('plans/index.html', plans=plans)
+    from ..models import Program, ProgramDay, ProgramCompletion
+    from ..routes.program import _completion_week, _is_done, _completion_map
+    programs = Program.query.order_by(Program.is_active.desc(), Program.created_at.desc()).all()
+
+    # Attach completion progress to each program
+    for p in programs:
+        all_days  = ProgramDay.query.filter_by(program_id=p.id).all()
+        active    = [d for d in all_days if d.name and 'Rest' not in d.name]
+        comp_map  = _completion_map(p.id)
+        done      = sum(1 for d in active if _is_done(comp_map.get(d.id)))
+        total     = len(active)
+        p.done_sessions  = done
+        p.total_sessions = total
+        p.progress_pct   = int(done / total * 100) if total > 0 else 0
+        p.comp_week      = _completion_week(p.id)
+
+    return render_template('plans/index.html', plans=plans, programs=programs, today=date.today())
 
 
 @plans_bp.route('/new', methods=['GET', 'POST'])

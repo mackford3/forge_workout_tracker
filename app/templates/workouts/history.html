@@ -19,7 +19,14 @@
 {% if workouts.items %}
   {% for w in workouts.items %}
   <a href="{{ url_for('workouts.view', workout_id=w.id) }}" class="workout-row">
-    <div><span class="badge badge-{{ w.workout_type }}">{{ w.workout_type }}</span></div>
+    <div>
+      {% if w.workout_type == 'strength+cardio' or (w.workout_type == 'strength' and w.cardio_sets.count() > 0) %}
+        <span class="badge badge-strength" style="font-size:9px;">strength</span>
+        <span class="badge badge-run" style="font-size:9px;margin-left:3px;">cardio</span>
+      {% else %}
+        <span class="badge badge-{{ w.workout_type }}">{{ w.workout_type }}</span>
+      {% endif %}
+    </div>
     <div class="wr-info">
       <div class="wr-name">{{ w.name }}</div>
       <div class="wr-meta">{{ w.completed_at.strftime('%a %b %-d, %Y') }}</div>

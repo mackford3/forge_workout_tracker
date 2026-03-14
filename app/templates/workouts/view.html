@@ -12,7 +12,15 @@
 <!-- Header -->
 <div style="margin-bottom:12px;">
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-    <span class="badge badge-{{ workout.workout_type }}">{{ workout.workout_type }}</span>
+    {% if workout.workout_type == 'strength+cardio' %}
+      <span class="badge badge-strength">strength</span>
+      <span class="badge badge-run" style="margin-left:4px;">cardio</span>
+    {% elif workout.workout_type == 'strength' and workout.cardio_sets.count() > 0 %}
+      <span class="badge badge-strength">strength</span>
+      <span class="badge badge-run" style="margin-left:4px;">cardio</span>
+    {% else %}
+      <span class="badge badge-{{ workout.workout_type }}">{{ workout.workout_type }}</span>
+    {% endif %}
     {% if workout.location %}
     <span class="badge" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);">
       {{ '🏋️' if workout.location == 'gym' else ('🏠' if workout.location == 'home' else ('🌳' if workout.location == 'outdoor' else '📍')) }}

@@ -58,7 +58,7 @@
   <!-- ══════════════════════════════════════════
        STRENGTH
   ══════════════════════════════════════════ -->
-  {% if wtype == 'strength' %}
+  {% if wtype in ('strength', 'strength+cardio') or (wtype == 'strength' and workout.cardio_sets.count() > 0) %}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
     <h2 style="font-size:20px;">SETS</h2>
     <div style="display:flex;gap:6px;align-items:center;">
@@ -143,6 +143,66 @@
     onclick="addExercise()">+ Add Exercise</button>
 
   <input type="hidden" id="global-set-index" value="{{ workout.sets.count() }}"/>
+
+  <!-- Existing cardio sets -->
+  {% set cardio_sets = workout.cardio_sets.all() %}
+  {% if cardio_sets %}
+  <h2 style="font-size:18px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:0 0 10px;">CARDIO SETS</h2>
+  {% endif %}
+  <div id="cardio-container">
+  {% for cs in cardio_sets %}
+  <div class="card cardio-block" style="margin-bottom:10px;position:relative;border-color:color-mix(in srgb,var(--run) 35%,transparent);">
+    <button type="button" onclick="this.closest('.card').remove()"
+      style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+    <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--run);margin-bottom:12px;">🚣 CARDIO SET</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div>
+        <label class="form-label">Machine</label>
+        <select class="form-control" name="cardio[{{ loop.index0 }}][machine]">
+          {% for m in ['row','skierg','bike','treadmill','other'] %}
+          <option value="{{ m }}" {{ 'selected' if cs.machine == m }}>{{ m|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Distance (m)</label>
+        <input class="form-control" type="number" name="cardio[{{ loop.index0 }}][distance_m]"
+          value="{{ cs.distance_m or '' }}" style="font-family:'DM Mono',monospace;"/>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+      <div>
+        <label class="form-label">Time (MM:SS)</label>
+        <input class="form-control" name="cardio[{{ loop.index0 }}][duration]"
+          value="{% if cs.duration_s %}{{ '%d:%02d' % (cs.duration_s//60, cs.duration_s%60) }}{% endif %}"
+          style="font-family:'DM Mono',monospace;"/>
+      </div>
+      <div>
+        <label class="form-label">Calories</label>
+        <input class="form-control" type="number" name="cardio[{{ loop.index0 }}][calories]"
+          value="{{ cs.calories or '' }}" style="font-family:'DM Mono',monospace;"/>
+      </div>
+      <div>
+        <label class="form-label">Damper</label>
+        <input class="form-control" type="number" name="cardio[{{ loop.index0 }}][damper]"
+          value="{{ cs.damper or '' }}" style="font-family:'DM Mono',monospace;"/>
+      </div>
+      <div>
+        <label class="form-label">RPE</label>
+        <input class="form-control" type="number" step="0.5" min="1" max="10"
+          name="cardio[{{ loop.index0 }}][rpe]"
+          value="{{ cs.rpe|float if cs.rpe else '' }}" style="font-family:'DM Mono',monospace;"/>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  </div>
+  <input type="hidden" id="global-cardio-index" value="{{ workout.cardio_sets.count() }}"/>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+    <button type="button" class="btn btn-secondary btn-full" style="border-style:dashed;" onclick="addExercise()">+ Strength</button>
+    <button type="button" class="btn btn-secondary btn-full" style="border-style:dashed;color:var(--run);border-color:color-mix(in srgb,var(--run) 40%,transparent);" onclick="addCardioSetEdit()">+ Cardio</button>
+  </div>
 
   <!-- ══════════════════════════════════════════
        CIRCUIT / AMRAP
@@ -304,7 +364,7 @@
   </button>
 </form>
 
-{% if wtype == 'strength' %}
+{% if wtype in ('strength', 'strength+cardio') or (wtype == 'strength' and workout.cardio_sets.count() > 0) %}
 <script>
   const exercises = [
     {% for ex in exercises %}
@@ -312,8 +372,45 @@
     {% endfor %}
   ];
 
-  let globalSetIndex = parseInt(document.getElementById('global-set-index').value);
-  let exerciseCount  = document.querySelectorAll('.exercise-block').length;
+  let globalSetIndex    = parseInt(document.getElementById('global-set-index').value);
+  let globalCardioIndex = parseInt(document.getElementById('global-cardio-index')?.value || 0);
+  let exerciseCount     = document.querySelectorAll('.exercise-block').length;
+
+  function addCardioSetEdit() {
+    const idx = globalCardioIndex++;
+    const block = document.createElement('div');
+    block.className = 'card cardio-block';
+    block.style.cssText = 'margin-bottom:10px;position:relative;border-color:color-mix(in srgb,var(--run) 35%,transparent);';
+    block.innerHTML = `
+      <button type="button" onclick="this.closest('.card').remove()"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--run);margin-bottom:12px;">🚣 CARDIO SET</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <label class="form-label">Machine</label>
+          <select class="form-control" name="cardio[${idx}][machine]">
+            <option value="row">Row</option><option value="skierg">SkiErg</option>
+            <option value="bike">Assault Bike</option><option value="treadmill">Treadmill</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Distance (m)</label>
+          <input class="form-control" type="number" name="cardio[${idx}][distance_m]" style="font-family:'DM Mono',monospace;"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+        <div><label class="form-label">Time (MM:SS)</label>
+          <input class="form-control" name="cardio[${idx}][duration]" placeholder="4:00" style="font-family:'DM Mono',monospace;"/></div>
+        <div><label class="form-label">Calories</label>
+          <input class="form-control" type="number" name="cardio[${idx}][calories]" style="font-family:'DM Mono',monospace;"/></div>
+        <div><label class="form-label">Damper</label>
+          <input class="form-control" type="number" name="cardio[${idx}][damper]" style="font-family:'DM Mono',monospace;"/></div>
+        <div><label class="form-label">RPE</label>
+          <input class="form-control" type="number" step="0.5" min="1" max="10" name="cardio[${idx}][rpe]" style="font-family:'DM Mono',monospace;"/></div>
+      </div>`;
+    document.getElementById('cardio-container').appendChild(block);
+  }
 
   function buildExerciseOptions(selectedId) {
     return '<option value="">Select exercise...</option>' +

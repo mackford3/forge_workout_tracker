@@ -2,9 +2,12 @@
 {% block title %}New Plan{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <h1>NEW PLAN</h1>
-  <p>Build your training structure</p>
+<div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;">
+  <div>
+    <h1>NEW PLAN</h1>
+    <p>Build your training structure</p>
+  </div>
+  <a href="{{ url_for('plans.index') }}" class="btn btn-secondary btn-sm">← Cancel</a>
 </div>
 
 <form method="post">
