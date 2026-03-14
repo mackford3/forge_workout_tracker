@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Benchmark Workouts{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>BENCHMARKS</h1>
+  <p>Premade fitness tests — track your progress over time</p>
+</div>
+
+{% for pw in workouts %}
+<a href="{{ url_for('premade.view', pw_id=pw.id) }}"
+   class="workout-row" style="margin-bottom:10px;">
+  <div style="font-size:28px;">🏁</div>
+  <div class="wr-info">
+    <div class="wr-name">{{ pw.name }}</div>
+    <div class="wr-meta">
+      {{ pw.stations.count() }} stations ·
+      {{ pw.results.count() }} attempt{{ 's' if pw.results.count() != 1 }}
+      {% set best = pw.results.filter_by(completed=True).order_by('total_time_s').first() %}
+      {% if best and best.total_time_s %}
+        · Best {{ best.total_time_s // 60 }}:{{ '%02d' % (best.total_time_s % 60) }}
+      {% endif %}
+    </div>
+  </div>
+  <div class="wr-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></div>
+</a>
+{% else %}
+<div class="card" style="text-align:center;padding:32px;color:var(--muted);">
+  No benchmark workouts yet.
+</div>
+{% endfor %}
+
+{% endblock %}

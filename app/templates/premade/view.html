@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% block title %}{{ pw.name }}{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+  <a href="{{ url_for('premade.index') }}" class="btn btn-secondary btn-sm">← Benchmarks</a>
+  <h1 style="font-size:28px;margin:0;flex:1;">{{ pw.name }}</h1>
+  <a href="{{ url_for('premade.log', pw_id=pw.id) }}" class="btn btn-primary btn-sm">+ Log Attempt</a>
+</div>
+
+{% if pw.description %}
+<p style="color:var(--muted);font-size:13px;margin-bottom:16px;">{{ pw.description }}</p>
+{% endif %}
+
+<!-- Stations list -->
+<div class="card" style="margin-bottom:14px;">
+  <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Stations</div>
+  {% for s in stations %}
+  <div style="display:flex;align-items:center;gap:10px;padding:6px 0;{% if not loop.last %}border-bottom:1px solid var(--border);{% endif %}">
+    <span style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--accent);min-width:24px;">{{ s.station_order }}</span>
+    <div style="flex:1;">
+      <span style="font-weight:500;font-size:14px;">{{ s.name }}</span>
+      {% if s.target_reps or s.target_distance_m or s.target_weight_lbs %}
+      <span style="font-size:11px;color:var(--muted);margin-left:8px;">
+        {% if s.target_reps %}{{ s.target_reps }} reps{% endif %}
+        {% if s.target_distance_m %}{{ s.target_distance_m|int }}m{% endif %}
+        {% if s.target_weight_lbs %}@ {{ s.target_weight_lbs|int }}lbs{% endif %}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Progress chart -->
+{% if results|length > 1 %}
+<div class="card" style="margin-bottom:14px;">
+  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--hyrox);">Total Time</div>
+    {% if best_time_s %}
+    <div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);">
+      Best: {{ fmt_time(best_time_s) }}
+    </div>
+    {% endif %}
+  </div>
+  <canvas id="time-chart" style="width:100%;max-height:220px;"></canvas>
+</div>
+{% endif %}
+
+<!-- Attempt history -->
+{% if results %}
+<div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.05em;color:var(--muted);margin-bottom:10px;">ATTEMPTS</div>
+{% for r in results %}
+<div class="card" style="margin-bottom:10px;{% if r.total_time_s == best_time_s and r.completed %}border-color:var(--hyrox);{% endif %}">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:{% if r._station_results %}10px{% else %}0{% endif %};">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:13px;color:var(--muted);">{{ r.done_at.strftime('%a %b %-d, %Y') }}</span>
+        {% if not r.completed %}
+        <span style="font-size:10px;font-family:'DM Mono',monospace;background:#ff444422;color:#ff4444;border:1px solid #ff444444;padding:2px 6px;border-radius:4px;">DNF</span>
+        {% elif r.total_time_s == best_time_s %}
+        <span style="font-size:10px;font-family:'DM Mono',monospace;background:var(--hyrox);color:#fff;padding:2px 6px;border-radius:4px;">BEST</span>
+        {% endif %}
+      </div>
+      {% if r.notes %}<div style="font-size:11px;color:var(--muted);margin-top:2px;font-style:italic;">{{ r.notes }}</div>{% endif %}
+    </div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--hyrox);">
+      {{ r._fmt_total or '—' }}
+    </div>
+  </div>
+
+  {% if r._station_results %}
+  <div style="border-top:1px solid var(--border);padding-top:10px;">
+    {% for s in stations %}
+    {% set sr = r._station_results.get(s.id) %}
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;">
+      <span style="color:var(--accent);font-family:'DM Mono',monospace;font-size:10px;min-width:16px;">{{ s.station_order }}</span>
+      <span style="flex:1;color:{% if sr and sr.skipped %}var(--muted){% else %}var(--text){% endif %};">{{ s.name }}</span>
+      {% if sr %}
+        {% if sr.skipped %}
+        <span style="font-size:11px;color:#ff4444;">skipped</span>
+        {% else %}
+          {% if sr.time_s %}
+          <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--hyrox);">{{ fmt_time(sr.time_s) }}</span>
+          {% endif %}
+          {% if sr.reps_completed %}
+          <span style="font-size:11px;color:var(--muted);">{{ sr.reps_completed }} reps</span>
+          {% endif %}
+          {% if sr.effort %}
+          <span style="font-size:11px;color:var(--muted);">E{{ sr.effort|float|int }}</span>
+          {% endif %}
+        {% endif %}
+      {% else %}
+      <span style="font-size:11px;color:var(--muted);">—</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="card" style="text-align:center;padding:32px;color:var(--muted);">
+  No attempts yet. <a href="{{ url_for('premade.log', pw_id=pw.id) }}" style="color:var(--accent);">Log your first →</a>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+{% if results|length > 1 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+async function loadChart() {
+  const res  = await fetch('/benchmarks/data/{{ pw.id }}');
+  const data = await res.json();
+  if (!data.length) return;
+
+  const labels = data.map(d => {
+    const dt = new Date(d.date + 'T12:00:00');
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  });
+  const times  = data.map(d => d.total_s);
+  const bestS  = Math.min(...times.filter(Boolean));
+
+  const ctx = document.getElementById('time-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: times,
+        borderColor: '#ff4d00',
+        backgroundColor: 'rgba(255,77,0,0.08)',
+        pointBackgroundColor: times.map(t => t === bestS ? '#e8ff00' : '#ff4d00'),
+        pointRadius: times.map(t => t === bestS ? 7 : 5),
+        tension: 0.3,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const s = ctx.raw;
+              const m = Math.floor(s/60), sec = s%60;
+              return ` ${m}:${String(sec).padStart(2,'0')}${data[ctx.dataIndex].completed ? '' : ' (DNF)'}`;
+            }
+          },
+          backgroundColor: '#1a1a1a', borderColor: '#2a2a2a', borderWidth: 1,
+          titleColor: '#ff4d00', bodyColor: '#f0f0f0', padding: 12,
+        }
+      },
+      scales: {
+        x: { grid: { color: '#1a1a1a' }, ticks: { color: '#666', font: { family: 'DM Mono', size: 11 } } },
+        y: {
+          reverse: true,  // lower time = better = higher on chart
+          grid: { color: '#1a1a1a' },
+          ticks: {
+            color: '#666', font: { family: 'DM Mono', size: 11 },
+            callback: v => { const m=Math.floor(v/60),s=v%60; return `${m}:${String(s).padStart(2,'0')}`; }
+          }
+        }
+      }
+    }
+  });
+}
+loadChart();
+</script>
+{% endif %}
+{% endblock %}

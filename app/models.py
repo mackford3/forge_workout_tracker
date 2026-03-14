@@ -268,3 +268,59 @@ class ProgramCompletion(db.Model):
 
 # Status options
 COMPLETION_STATUSES = ['done', 'skipped', 'altered', 'delayed']
+
+
+# ── Premade Workouts (Fitness Tests / Benchmarks) ──────────
+
+class PremadeWorkout(db.Model):
+    __tablename__ = 'premade_workouts'
+    id          = db.Column(db.Integer, primary_key=True)
+    name        = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text)
+    category    = db.Column(db.String(50), default='fitness_test')
+    created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+    stations    = db.relationship('PremadeStation', backref='workout',
+                                  order_by='PremadeStation.station_order',
+                                  lazy='dynamic', cascade='all, delete-orphan')
+    results     = db.relationship('PremadeResult', backref='premade_workout',
+                                  lazy='dynamic', cascade='all, delete-orphan')
+
+
+class PremadeStation(db.Model):
+    __tablename__ = 'premade_stations'
+    id                 = db.Column(db.Integer, primary_key=True)
+    premade_workout_id = db.Column(db.Integer, db.ForeignKey('premade_workouts.id'), nullable=False)
+    station_order      = db.Column(db.Integer, nullable=False)
+    name               = db.Column(db.String(150), nullable=False)
+    target_reps        = db.Column(db.Integer)
+    target_distance_m  = db.Column(db.Numeric(8, 2))
+    target_weight_lbs  = db.Column(db.Numeric(6, 2))
+    notes              = db.Column(db.Text)
+
+
+class PremadeResult(db.Model):
+    __tablename__ = 'premade_results'
+    id                 = db.Column(db.Integer, primary_key=True)
+    premade_workout_id = db.Column(db.Integer, db.ForeignKey('premade_workouts.id'), nullable=False)
+    workout_id         = db.Column(db.Integer, db.ForeignKey('workouts.id'), nullable=True)
+    total_time_s       = db.Column(db.Integer)
+    completed          = db.Column(db.Boolean, default=True)
+    notes              = db.Column(db.Text)
+    done_at            = db.Column(db.DateTime, default=datetime.utcnow)
+    station_results    = db.relationship('PremadeStationResult', backref='result',
+                                         order_by='PremadeStationResult.station_order',
+                                         lazy='dynamic', cascade='all, delete-orphan')
+
+
+class PremadeStationResult(db.Model):
+    __tablename__ = 'premade_station_results'
+    id                = db.Column(db.Integer, primary_key=True)
+    premade_result_id = db.Column(db.Integer, db.ForeignKey('premade_results.id'), nullable=False)
+    station_id        = db.Column(db.Integer, db.ForeignKey('premade_stations.id'), nullable=False)
+    station_order     = db.Column(db.Integer, nullable=False)
+    time_s            = db.Column(db.Integer)
+    reps_completed    = db.Column(db.Integer)
+    effort            = db.Column(db.Numeric(3, 1))
+    notes             = db.Column(db.Text)
+    skipped           = db.Column(db.Boolean, default=False)
+    station           = db.relationship('PremadeStation')

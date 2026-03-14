@@ -10,7 +10,13 @@ def index():
     exercises = Exercise.query.filter(
         Exercise.category == 'strength'
     ).order_by(Exercise.name).all()
-    return render_template('progress/index.html', exercises=exercises)
+    try:
+        from ..models import PremadeWorkout
+        premade_workouts = PremadeWorkout.query.order_by(PremadeWorkout.name).all()
+    except Exception:
+        premade_workouts = []
+    return render_template('progress/index.html', exercises=exercises,
+                           premade_workouts=premade_workouts)
 
 
 @progress_bp.route('/data')

@@ -372,10 +372,15 @@
           <div class="lc-label" style="color:var(--circuit)">Circuit</div>
           <div class="lc-sub">Rounds · Exercises</div>
         </a>
-        <a href="{{ url_for('workouts.log_circuit') }}?type=amrap" class="log-card" style="grid-column:span 2;border-color:color-mix(in srgb, var(--amrap) 30%, transparent)">
+        <a href="{{ url_for('workouts.log_circuit') }}?type=amrap" class="log-card" style="border-color:color-mix(in srgb, var(--amrap) 30%, transparent)">
           <div class="lc-icon">⚡</div>
           <div class="lc-label" style="color:var(--amrap)">AMRAP</div>
           <div class="lc-sub">As Many Rounds As Possible</div>
+        </a>
+        <a href="{{ url_for('premade.index') }}" class="log-card" style="border-color:color-mix(in srgb, var(--hyrox) 30%, transparent)">
+          <div class="lc-icon">🏁</div>
+          <div class="lc-label" style="color:var(--hyrox)">Benchmark</div>
+          <div class="lc-sub">Fitness Tests &amp; PRs</div>
         </a>
       </div>
     </div>
