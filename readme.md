@@ -207,14 +207,22 @@ All tables live in the `forge` schema inside the `forge_workouts` database.
 
 Design and UX improvements identified for future iterations:
 
+### ✅ Resolved
+
+**Weight unit toggle without reload** — Dashboard weight stat now stores both lbs and kg as `data-lbs`/`data-kg` attributes. Toggling the unit button swaps all labelled values in the DOM instantly — no page reload.
+
+**Context-aware dashboard header** — The dashboard `h1` and subtitle are now dynamic: 7+ day streak shows "X DAYS 🔥 / You're on fire", 3–6 day streak shows "X-DAY STREAK", trained today shows "GREAT WORK", otherwise falls back to year stats with the next program day name as subtitle.
+
+**Workout type breakdown chart** — The badge row is now preceded by a proportional stacked bar: each workout type gets a flex segment in its brand colour (`--strength`, `--run`, `--hyrox`, etc.), followed by the existing badge row below. Hidden when there are no workouts.
+
+**Delete from history rows (swipe-to-delete)** — Each history row is wrapped in a swipe container. On mobile, swipe left > 60px reveals a red delete zone; tapping the trash icon shows an inline Cancel / Yes, Delete confirmation. Desktop users can also tap the trash icon that appears on the right side of the revealed zone.
+
+### Open
+
 - [ ] **Autosave / data-loss protection** — Persist in-progress log form state to `localStorage` so a browser refresh, accidental navigation, or app switch doesn't wipe unsaved sets. Restore on next visit with a banner offering to resume or discard.
-- [ ] **Weight unit toggle without reload** — Switch between lbs and kg client-side by converting all displayed values in place, instead of a full page reload. Requires storing both values in the DOM and swapping on toggle.
 - [ ] **"Log again" shortcut from history** — A button on each workout history row (or on the workout view page) that opens the log form pre-filled with the same exercises, sets, and session config from that workout.
-- [ ] **Context-aware dashboard header** — Replace the static greeting with a dynamic header that reflects recent activity: congratulates a streak milestone, notes a rest day, or surfaces the next planned workout.
-- [ ] **Workout type breakdown chart** — Replace the badge row on the dashboard with a small stacked bar or donut chart showing the split of workout types over the last 30/90 days.
 - [ ] **History search and filter** — Add a search box and type/date filters to the workout history page so specific sessions can be found quickly as history grows.
 - [ ] **History pagination (load more)** — Replace full list rendering with an initial page of ~20 workouts and an "Load More" button or infinite scroll, so the history page stays fast at scale.
-- [ ] **Delete from history rows** — Expose a swipe-to-delete or long-press delete option directly on history rows, so a mistaken log can be removed without navigating into the full workout view.
 - [ ] **add premade workouts for hyrox sims**
 - [ ] **add premade workouts for circuits**
 - [ ] **add premade workouts for strength**

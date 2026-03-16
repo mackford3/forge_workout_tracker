@@ -387,19 +387,29 @@
   </div>
 
   <script>
-    // Weight unit toggle (stored in localStorage, reloads with param)
+    // Weight unit toggle — swaps DOM values in place, no reload
     function toggleWeightUnit() {
       const current = document.getElementById('unit-label').textContent.trim();
       const newUnit = current === 'KG' ? 'lbs' : 'kg';
-      fetch('/set-unit/' + newUnit).then(() => location.reload());
+      fetch('/set-unit/' + newUnit);
+      document.getElementById('unit-label').textContent = newUnit.toUpperCase();
+      document.querySelectorAll('[data-lbs]').forEach(el => {
+        const raw = newUnit === 'lbs' ? parseInt(el.dataset.lbs) : parseInt(el.dataset.kg);
+        el.textContent = raw.toLocaleString();
+      });
+      document.querySelectorAll('[data-unit-label]').forEach(el => {
+        el.textContent = newUnit + ' Lifted';
+      });
     }
 
-    // Pre-fill any blank datetime-local inputs with current local time
+    // Pre-fill any blank datetime-local inputs with current EST time
     document.querySelectorAll('input[type="datetime-local"]').forEach(el => {
       if (!el.value) {
         const now = new Date();
         now.setSeconds(0, 0);
-        el.value = now.toISOString().slice(0, 16);
+        const est = new Date(now.toLocaleString('en-US', {timeZone: 'America/New_York'}));
+        const pad = n => String(n).padStart(2, '0');
+        el.value = `${est.getFullYear()}-${pad(est.getMonth()+1)}-${pad(est.getDate())}T${pad(est.getHours())}:${pad(est.getMinutes())}`;
       }
     });
 
