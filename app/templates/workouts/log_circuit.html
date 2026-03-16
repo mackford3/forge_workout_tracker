@@ -5,8 +5,13 @@
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
   <a href="{{ url_for('workouts.history') }}" class="btn btn-secondary btn-sm">← Cancel</a>
   <div>
+    {% if circuit_type == 'amrap' %}
     <h1 style="font-size:28px;margin:0;">⚡ AMRAP</h1>
     <p style="color:var(--muted);font-size:13px;margin:2px 0 0;">As Many Rounds As Possible</p>
+    {% else %}
+    <h1 style="font-size:28px;margin:0;">🔄 CIRCUIT</h1>
+    <p style="color:var(--muted);font-size:13px;margin:2px 0 0;">Structured Circuit Training</p>
+    {% endif %}
   </div>
 </div>
 
@@ -61,15 +66,9 @@
 
   <div id="circuit-exercises-container"></div>
 
-  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;"
-    hx-get="{{ url_for('workouts.htmx_circuit_exercise_row') }}"
-    hx-target="#circuit-exercises-container"
-    hx-swap="beforeend"
-    hx-on::after-request="incEx()"
-    id="add-ex-btn">
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;" onclick="addExercise()">
     + Add Exercise
   </button>
-  <input type="hidden" id="ex-index" value="0"/>
 
   <div class="form-group">
     <label class="form-label">Notes</label>
@@ -83,13 +82,74 @@
 
 <script>
   let exIdx = 0;
-  function incEx() {
-    exIdx++;
-    const btn = document.getElementById('add-ex-btn');
-    btn.setAttribute('hx-get', `{{ url_for('workouts.htmx_circuit_exercise_row') }}?index=${exIdx}`);
-    htmx.process(btn);
-    setUnit(document.getElementById('global-unit').value);
+
+  const EXERCISES = [
+    {% for ex in exercises %}
+    {id: {{ ex.id }}, name: {{ ex.name | tojson }}, group: {{ (ex.muscle_group or '') | tojson }}}{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  function buildOptions() {
+    let html = '<option value="">Select exercise...</option>';
+    let curGroup = null;
+    EXERCISES.forEach(ex => {
+      if (ex.group !== curGroup) {
+        if (curGroup !== null) html += '</optgroup>';
+        html += `<optgroup label="${ex.group || 'Other'}">`;
+        curGroup = ex.group;
+      }
+      html += `<option value="${ex.id}">${ex.name}${ex.group ? ' (' + ex.group + ')' : ''}</option>`;
+    });
+    if (curGroup !== null) html += '</optgroup>';
+    return html;
   }
+
+  function addExercise() {
+    const unit = document.getElementById('global-unit').value;
+    const idx  = exIdx++;
+    const row  = `<div class="set-row card card-sm" style="margin-bottom:8px;position:relative;">
+      <button type="button" onclick="removeRow(this)"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Exercise ${idx + 1}</div>
+      <div class="form-group">
+        <label class="form-label">Exercise</label>
+        <select class="form-control" name="exercises[${idx}][exercise_id]" required>${buildOptions()}</select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div>
+          <label class="form-label">Reps</label>
+          <input class="form-control" type="number" name="exercises[${idx}][reps]" placeholder="10"/>
+        </div>
+        <div>
+          <label class="form-label">Weight</label>
+          <input class="form-control" type="number" step="0.5" name="exercises[${idx}][weight]" placeholder="0"/>
+        </div>
+        <div>
+          <label class="form-label">Unit</label>
+          <select class="form-control unit-select" name="exercises[${idx}][unit]">
+            <option value="kg" ${unit === 'kg' ? 'selected' : ''}>kg</option>
+            <option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>lbs</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+        <div>
+          <label class="form-label">Duration (MM:SS)</label>
+          <input class="form-control" name="exercises[${idx}][duration]" placeholder="0:30"/>
+        </div>
+        <div>
+          <label class="form-label">Distance (m)</label>
+          <input class="form-control" type="number" name="exercises[${idx}][distance_m]" placeholder="200"/>
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label class="form-label">Notes</label>
+        <input class="form-control" name="exercises[${idx}][notes]" placeholder="Optional"/>
+      </div>
+    </div>`;
+    document.getElementById('circuit-exercises-container').insertAdjacentHTML('beforeend', row);
+  }
+
   function setUnit(unit) { document.querySelectorAll('.unit-select').forEach(s => s.value = unit); }
   function removeRow(btn) { btn.closest('.set-row').remove(); }
 </script>

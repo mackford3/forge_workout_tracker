@@ -123,20 +123,44 @@ def log(pw_id):
         db.session.commit()
         return redirect(url_for('premade.view', pw_id=pw_id))
 
+    last_result = (PremadeResult.query
+                   .filter_by(premade_workout_id=pw_id)
+                   .order_by(PremadeResult.done_at.desc())
+                   .first())
+    last_times = {}
+    if last_result:
+        for sr in last_result.station_results.all():
+            last_times[sr.station_id] = _fmt_time(sr.time_s)
+
     return render_template('premade/log.html', pw=pw, stations=stations,
-                           weight_unit=session.get('weight_unit', 'lbs'))
+                           weight_unit=session.get('weight_unit', 'lbs'),
+                           last_result=last_result, last_times=last_times)
 
 
 @premade_bp.route('/data/<int:pw_id>')
 def chart_data(pw_id):
-    results = (PremadeResult.query
-               .filter_by(premade_workout_id=pw_id)
-               .order_by(PremadeResult.done_at.asc()).all())
-    return jsonify([{
-        'date':        r.done_at.strftime('%Y-%m-%d'),
-        'total_s':     r.total_time_s,
-        'total_fmt':   _fmt_time(r.total_time_s),
-        'completed':   r.completed,
-        'result_id':   r.id,
-        'workout_id':  r.workout_id,
-    } for r in results if r.total_time_s])
+    pw       = PremadeWorkout.query.get_or_404(pw_id)
+    stations = pw.stations.order_by(PremadeStation.station_order).all()
+    results  = (PremadeResult.query
+                .filter_by(premade_workout_id=pw_id)
+                .order_by(PremadeResult.done_at.asc()).all())
+
+    station_list = [{'id': s.id, 'name': s.name, 'order': s.station_order} for s in stations]
+
+    result_list = []
+    for r in results:
+        splits = {
+            str(sr.station_id): {'time_s': sr.time_s, 'time_fmt': _fmt_time(sr.time_s)}
+            for sr in r.station_results.all()
+        }
+        result_list.append({
+            'date':       r.done_at.strftime('%Y-%m-%d'),
+            'total_s':    r.total_time_s,
+            'total_fmt':  _fmt_time(r.total_time_s),
+            'completed':  r.completed,
+            'result_id':  r.id,
+            'workout_id': r.workout_id,
+            'splits':     splits,
+        })
+
+    return jsonify({'stations': station_list, 'results': result_list})

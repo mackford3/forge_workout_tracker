@@ -1,10 +1,57 @@
 from flask import Blueprint, render_template, session, redirect, request, url_for, current_app
 from sqlalchemy import func, extract
 from datetime import datetime, timedelta, date
-from ..models import db, Workout, WorkoutSet, Run, WorkoutPlan, HyroxResult, Program, ProgramDay
+from ..models import db, Workout, WorkoutSet, Run, WorkoutPlan, HyroxResult, Program, ProgramDay, ProgramCompletion
 from sqlalchemy import extract as db_extract
 
 main_bp = Blueprint('main', __name__)
+
+
+def _next_program_day(program):
+    """Return (week_num, day) for the next incomplete non-rest day, completion-based."""
+    comps = (ProgramCompletion.query
+             .join(ProgramDay)
+             .filter(ProgramDay.program_id == program.id)
+             .all())
+    comp_map = {c.day_id: c for c in comps}
+
+    def _done(comp):
+        if comp is None:
+            return False
+        if comp.status in ('done', 'altered'):
+            return True
+        return comp.status is None and bool(comp.completed)
+
+    # Find latest week with at least one completed active day
+    latest_done_week = 0
+    for wn in range(1, program.total_weeks + 1):
+        days = ProgramDay.query.filter_by(program_id=program.id, week_number=wn).all()
+        if not days:
+            break
+        active = [d for d in days if d.name and 'Rest' not in d.name]
+        if any(_done(comp_map.get(d.id)) for d in active):
+            latest_done_week = wn
+
+    comp_week = 1 if latest_done_week == 0 else latest_done_week
+
+    # If that week is fully complete, advance to the next
+    if latest_done_week > 0:
+        days = ProgramDay.query.filter_by(program_id=program.id, week_number=latest_done_week).all()
+        active = [d for d in days if d.name and 'Rest' not in d.name]
+        if all(_done(comp_map.get(d.id)) for d in active):
+            comp_week = min(latest_done_week + 1, program.total_weeks)
+
+    # Find first incomplete non-rest day at comp_week (or comp_week+1)
+    for wn in range(comp_week, min(comp_week + 2, program.total_weeks + 1)):
+        days = (ProgramDay.query
+                .filter_by(program_id=program.id, week_number=wn)
+                .order_by(ProgramDay.day_number)
+                .all())
+        for day in days:
+            if day.name and 'Rest' not in day.name and not _done(comp_map.get(day.id)):
+                return wn, day
+
+    return comp_week, None
 
 
 @main_bp.route('/')
@@ -93,21 +140,14 @@ def index():
         extract('year', Workout.completed_at) == year
     ).group_by(Workout.location).all()
 
-    # Today's workout from active program
+    # Next workout from active program (completion-based)
     today_program_day = None
     today_program     = Program.query.filter_by(is_active=True).first()
     if today_program:
-        from datetime import date
-        delta     = (date.today() - today_program.start_date).days
-        week_num  = min((delta // 7) + 1, today_program.total_weeks)
-        day_num   = (delta % 7) + 1
-        today_program_day = ProgramDay.query.filter_by(
-            program_id=today_program.id,
-            week_number=week_num,
-            day_number=day_num
-        ).first()
+        week_num, today_program_day = _next_program_day(today_program)
         if today_program_day:
-            today_program_day._week = week_num
+            today_program_day._week       = week_num
+            today_program_day._is_upcoming = True
 
     return render_template('index.html',
         ytd_workouts=ytd_workouts,
@@ -217,21 +257,14 @@ def calendar(year=None, month=None):
     else:
         month_distance = 0
 
-    # Today's workout from active program
+    # Next workout from active program (completion-based)
     today_program_day = None
     today_program     = Program.query.filter_by(is_active=True).first()
     if today_program:
-        from datetime import date
-        delta     = (date.today() - today_program.start_date).days
-        week_num  = min((delta // 7) + 1, today_program.total_weeks)
-        day_num   = (delta % 7) + 1
-        today_program_day = ProgramDay.query.filter_by(
-            program_id=today_program.id,
-            week_number=week_num,
-            day_number=day_num
-        ).first()
+        week_num, today_program_day = _next_program_day(today_program)
         if today_program_day:
-            today_program_day._week = week_num
+            today_program_day._week       = week_num
+            today_program_day._is_upcoming = True
 
     return render_template('calendar.html',
         year=year, month=month, month_name=month_name,

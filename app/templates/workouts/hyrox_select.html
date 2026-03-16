@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+{% block title %}Start Hyrox{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+  <a href="javascript:history.back()" class="btn btn-secondary btn-sm">← Back</a>
+  <div>
+    <h1 style="font-size:28px;margin:0;">🔥 HYROX</h1>
+    <p style="color:var(--muted);font-size:13px;margin:2px 0 0;">Select session type to begin</p>
+  </div>
+</div>
+
+<!-- Mode Toggle -->
+<div style="display:flex;background:var(--surface2);border-radius:10px;padding:4px;margin-bottom:24px;gap:4px;">
+  <button id="tab-race" onclick="showTab('race')"
+    style="flex:1;padding:10px;border:none;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;background:var(--hyrox);color:#fff;letter-spacing:.04em;">
+    🏁 RACE
+  </button>
+  <button id="tab-training" onclick="showTab('training')"
+    style="flex:1;padding:10px;border:none;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;background:transparent;color:var(--muted);letter-spacing:.04em;">
+    💪 TRAINING
+  </button>
+</div>
+
+<!-- ── RACE PANEL ─────────────────────────────────────── -->
+<div id="panel-race">
+  <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;">Select Race Format</div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px;">
+    <label class="hyrox-race-card" data-type="singles">
+      <input type="radio" name="race_type" value="singles" checked style="display:none;">
+      <div class="hrc-inner">
+        <div style="font-size:22px;margin-bottom:4px;">🥇</div>
+        <div style="font-weight:700;font-size:15px;">Singles</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Individual — all stations solo</div>
+      </div>
+    </label>
+    <label class="hyrox-race-card" data-type="doubles">
+      <input type="radio" name="race_type" value="doubles" style="display:none;">
+      <div class="hrc-inner">
+        <div style="font-size:22px;margin-bottom:4px;">👥</div>
+        <div style="font-weight:700;font-size:15px;">Doubles</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">2 athletes, alternate stations</div>
+      </div>
+    </label>
+    <label class="hyrox-race-card" data-type="relay">
+      <input type="radio" name="race_type" value="relay" style="display:none;">
+      <div class="hrc-inner">
+        <div style="font-size:22px;margin-bottom:4px;">🏃‍♂️🏃‍♀️</div>
+        <div style="font-weight:700;font-size:15px;">Relay</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">4-person team relay</div>
+      </div>
+    </label>
+  </div>
+
+  <a id="start-race-btn" href="{{ url_for('workouts.log_hyrox_race') }}?race_type=singles"
+    class="btn btn-primary btn-full" style="font-size:17px;padding:16px;display:block;text-align:center;text-decoration:none;">
+    Start Race Log →
+  </a>
+
+  <div class="card" style="margin-top:16px;padding:12px 14px;">
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:18px;">ℹ️</span>
+      <div style="font-size:13px;color:var(--muted);line-height:1.5;">
+        Race mode logs all <strong style="color:var(--text)">16 stations</strong> in official order with full split times. Use this for actual competitions or complete race-day simulations.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TRAINING PANEL ──────────────────────────────────── -->
+<div id="panel-training" style="display:none;">
+  <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;">Select Training Workout</div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    {% set icons = {
+      'full_sim':     '🔥',
+      'half_sim_a':   '½',
+      'half_sim_b':   '½',
+      'workouts_only':'💪',
+      'running_only': '🏃'
+    } %}
+    {% set colors = {
+      'full_sim':     'var(--hyrox)',
+      'half_sim_a':   '#f59e0b',
+      'half_sim_b':   '#f59e0b',
+      'workouts_only':'var(--strength)',
+      'running_only': 'var(--run)'
+    } %}
+    {% for key, preset in training_presets.items() %}
+    <a href="{{ url_for('workouts.log_hyrox_training') }}?preset={{ key }}"
+      style="display:block;text-decoration:none;">
+      <div class="card card-sm" style="border-color:color-mix(in srgb, {{ colors[key] }} 25%, transparent);transition:border-color .15s,background .15s;"
+        onmouseenter="this.style.borderColor='{{ colors[key] }}';this.style.background='color-mix(in srgb, {{ colors[key] }} 6%, var(--surface))'"
+        onmouseleave="this.style.borderColor='';this.style.background=''">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:42px;height:42px;border-radius:10px;background:color-mix(in srgb, {{ colors[key] }} 15%, transparent);display:flex;align-items:center;justify-content:center;font-size:{% if key in ('half_sim_a','half_sim_b') %}18px{% else %}20px{% endif %};font-weight:700;color:{{ colors[key] }};flex-shrink:0;">
+            {{ icons[key] }}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:15px;color:var(--text);">{{ preset.label }}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4;">{{ preset.description }}</div>
+          </div>
+          <div style="color:var(--muted);font-size:18px;flex-shrink:0;">›</div>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <div class="card" style="margin-top:16px;padding:12px 14px;">
+    <div style="display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:18px;">💡</span>
+      <div style="font-size:13px;color:var(--muted);line-height:1.5;">
+        Training sessions log the same station data but with a <strong style="color:var(--text)">subset of stations</strong>. Perfect for simulation days, drill sessions, and targeted practice.
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .hyrox-race-card {
+    display: block;
+    cursor: pointer;
+  }
+  .hyrox-race-card .hrc-inner {
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    transition: border-color .15s, background .15s;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .hyrox-race-card input:checked + .hrc-inner {
+    border-color: var(--hyrox);
+    background: color-mix(in srgb, var(--hyrox) 8%, var(--surface));
+  }
+  .hyrox-race-card:hover .hrc-inner {
+    border-color: color-mix(in srgb, var(--hyrox) 50%, var(--border));
+  }
+</style>
+
+<script>
+  function showTab(tab) {
+    const isRace = tab === 'race';
+    document.getElementById('panel-race').style.display     = isRace ? '' : 'none';
+    document.getElementById('panel-training').style.display = isRace ? 'none' : '';
+
+    const tabRace  = document.getElementById('tab-race');
+    const tabTrain = document.getElementById('tab-training');
+    if (isRace) {
+      tabRace.style.background  = 'var(--hyrox)';
+      tabRace.style.color       = '#fff';
+      tabTrain.style.background = 'transparent';
+      tabTrain.style.color      = 'var(--muted)';
+    } else {
+      tabTrain.style.background = 'var(--hyrox)';
+      tabTrain.style.color      = '#fff';
+      tabRace.style.background  = 'transparent';
+      tabRace.style.color       = 'var(--muted)';
+    }
+  }
+
+  // Update the Start Race button URL when race type changes
+  document.querySelectorAll('input[name="race_type"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.getElementById('start-race-btn').href =
+        '{{ url_for("workouts.log_hyrox_race") }}?race_type=' + radio.value;
+    });
+  });
+
+  // Also handle clicking the card labels
+  document.querySelectorAll('.hyrox-race-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const raceType = card.dataset.type;
+      document.getElementById('start-race-btn').href =
+        '{{ url_for("workouts.log_hyrox_race") }}?race_type=' + raceType;
+    });
+  });
+</script>
+{% endblock %}

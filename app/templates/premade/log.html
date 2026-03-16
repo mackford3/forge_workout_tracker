@@ -54,9 +54,18 @@
   </div>
 
   <!-- Stations -->
-  <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.05em;color:var(--muted);margin-bottom:10px;">STATIONS</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.05em;color:var(--muted);">STATIONS</div>
+    {% if last_result %}
+    <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;">
+      Last: {{ last_result.done_at.strftime('%b %d, %Y') }}
+      {% if last_result.total_time_s %}· {{ last_result.done_at.strftime('%b %d') }} total: <strong style="color:var(--hyrox);">{{ last_times.values()|list|join(' + ') if false else '' }}{{ '%d:%02d'|format(last_result.total_time_s // 60, last_result.total_time_s % 60) }}</strong>{% endif %}
+    </div>
+    {% endif %}
+  </div>
 
   {% for s in stations %}
+  {% set last_t = last_times.get(s.id) %}
   <div class="card" style="margin-bottom:8px;" id="station-card-{{ s.id }}">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
       <span style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);min-width:28px;">{{ s.station_order }}</span>
@@ -71,6 +80,12 @@
         </div>
         {% endif %}
       </div>
+      {% if last_t %}
+      <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);text-align:right;flex-shrink:0;">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;">Last</div>
+        <div style="color:var(--hyrox);">{{ last_t }}</div>
+      </div>
+      {% endif %}
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;">
         <input type="checkbox" name="station_{{ s.id }}_skip" onchange="toggleStation({{ s.id }}, this.checked)"/>
         Skip
@@ -81,7 +96,7 @@
       <div>
         <label class="form-label">Time (MM:SS)</label>
         <input class="form-control station-time" id="time-{{ s.id }}"
-               name="station_{{ s.id }}_time" placeholder="0:00"
+               name="station_{{ s.id }}_time" placeholder="{{ last_t or '0:00' }}"
                style="font-family:'DM Mono',monospace;"
                oninput="updateTotal()"/>
       </div>

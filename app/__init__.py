@@ -47,19 +47,15 @@ def create_app():
     @app.context_processor
     def inject_today_program():
         """Make today_program_day available in all templates for the log modal."""
-        from .models import Program, ProgramDay
-        from datetime import date
+        from .models import Program
+        from .routes.main import _next_program_day
         try:
             prog = Program.query.filter_by(is_active=True).first()
-            if prog and prog.start_date:
-                delta    = (date.today() - prog.start_date).days
-                week_num = min((delta // 7) + 1, prog.total_weeks)
-                day_num  = (delta % 7) + 1
-                today_pd = ProgramDay.query.filter_by(
-                    program_id=prog.id, week_number=week_num, day_number=day_num
-                ).first()
+            if prog:
+                week_num, today_pd = _next_program_day(prog)
                 if today_pd:
-                    today_pd._week = week_num
+                    today_pd._week       = week_num
+                    today_pd._is_upcoming = True
                 return dict(today_program=prog, today_program_day=today_pd)
         except Exception:
             pass
