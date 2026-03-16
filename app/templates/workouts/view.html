@@ -33,7 +33,7 @@
 </div>
 
 <!-- Session stats -->
-{% if workout.duration_minutes or workout.calories or workout.avg_bpm %}
+{% if workout.duration_minutes or workout.calories or workout.avg_bpm or workout.session_rpe %}
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
   {% if workout.duration_minutes %}
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:70px;">
@@ -51,6 +51,12 @@
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:70px;">
     <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:#ff4466;">{{ workout.avg_bpm }}</div>
     <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">bpm</div>
+  </div>
+  {% endif %}
+  {% if workout.session_rpe %}
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:70px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--circuit);">{{ workout.session_rpe|float }}</div>
+    <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">RPE</div>
   </div>
   {% endif %}
 </div>
@@ -435,12 +441,24 @@
 
 <!-- Delete -->
 <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
-  <form method="post" action="{{ url_for('workouts.delete', workout_id=workout.id) }}"
-        onsubmit="return confirm('Delete this workout?')">
-    <button type="submit" class="btn btn-secondary btn-full" style="color:#ff4466;border-color:#ff4466;">
-      Delete Workout
-    </button>
-  </form>
+  <button type="button" class="btn btn-secondary btn-full" style="color:#ff4466;border-color:color-mix(in srgb,#ff4466 40%,transparent);"
+    onclick="document.getElementById('delete-confirm').style.display='block';this.style.display='none';">
+    Delete Workout
+  </button>
+  <div id="delete-confirm" style="display:none;">
+    <p style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:10px;">
+      This cannot be undone.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <button type="button" class="btn btn-secondary btn-full"
+        onclick="document.getElementById('delete-confirm').style.display='none';document.querySelector('[onclick*=delete-confirm]').style.display='';">
+        Cancel
+      </button>
+      <form method="post" action="{{ url_for('workouts.delete', workout_id=workout.id) }}" style="margin:0;">
+        <button type="submit" class="btn btn-danger btn-full">Yes, Delete</button>
+      </form>
+    </div>
+  </div>
 </div>
 
 {% endblock %}

@@ -46,6 +46,7 @@ class Workout(db.Model):
     duration_minutes = db.Column(db.Integer)
     calories         = db.Column(db.Integer)
     avg_bpm          = db.Column(db.Integer)
+    session_rpe      = db.Column(db.Numeric(3, 1))
     notes            = db.Column(db.Text)
     completed_at     = db.Column(db.DateTime, default=datetime.utcnow)
     created_at       = db.Column(db.DateTime, default=datetime.utcnow)
@@ -150,6 +151,42 @@ HYROX_DEFAULT_STATIONS = [
     ("1km Run",           15, None, None),
     ("Wall Balls",        16, None, 100),
 ]
+
+_WORKOUT_STATIONS = [s for s in HYROX_DEFAULT_STATIONS if s[0] != "1km Run"]
+_RUN_STATIONS     = [s for s in HYROX_DEFAULT_STATIONS if s[0] == "1km Run"]
+
+HYROX_TRAINING_PRESETS = {
+    'full_sim': {
+        'label':       'Full Simulation',
+        'description': 'All 16 stations — complete race simulation',
+        'default_name': 'Hyrox Full Sim',
+        'stations':    HYROX_DEFAULT_STATIONS,
+    },
+    'half_sim_a': {
+        'label':       'Half Sim — A Side',
+        'description': 'Stations 1–8: SkiErg, Sled Push, Sled Pull, Burpee Broad Jump',
+        'default_name': 'Hyrox Half Sim A',
+        'stations':    HYROX_DEFAULT_STATIONS[:8],
+    },
+    'half_sim_b': {
+        'label':       'Half Sim — B Side',
+        'description': 'Stations 9–16: Row, Farmers Carry, Sandbag Lunges, Wall Balls',
+        'default_name': 'Hyrox Half Sim B',
+        'stations':    HYROX_DEFAULT_STATIONS[8:],
+    },
+    'workouts_only': {
+        'label':       'Workout Stations Only',
+        'description': '8 exercise stations, no running',
+        'default_name': 'Hyrox Station Practice',
+        'stations':    _WORKOUT_STATIONS,
+    },
+    'running_only': {
+        'label':       'Running Only',
+        'description': '8 × 1 km runs',
+        'default_name': 'Hyrox Running',
+        'stations':    _RUN_STATIONS,
+    },
+}
 
 
 class HyroxStation(db.Model):

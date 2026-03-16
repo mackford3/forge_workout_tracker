@@ -32,7 +32,7 @@
                value="{{ workout.completed_at.strftime('%Y-%m-%dT%H:%M') }}"/>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
       <div class="form-group">
         <label class="form-label">Duration (min)</label>
         <input class="form-control" type="number" name="duration_minutes"
@@ -47,6 +47,11 @@
         <label class="form-label">Avg BPM</label>
         <input class="form-control" type="number" name="avg_bpm"
                value="{{ workout.avg_bpm or '' }}" placeholder="145"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Session RPE</label>
+        <input class="form-control" type="number" step="0.5" min="1" max="10" name="session_rpe"
+               value="{{ workout.session_rpe|float if workout.session_rpe else '' }}" placeholder="7"/>
       </div>
     </div>
     <div class="form-group" style="margin-bottom:0;">

@@ -1,9 +1,10 @@
 from sqlalchemy import func
-from flask import Blueprint, render_template, request, redirect, url_for, Response
+from flask import Blueprint, render_template, request, redirect, url_for, Response, session
 import csv, io
 from datetime import datetime
 from ..models import (db, Workout, WorkoutSet, Exercise, Run, RunSegment,
                       CardioSet, HyroxResult, HyroxStation, HYROX_DEFAULT_STATIONS,
+                      HYROX_TRAINING_PRESETS,
                       Circuit, CircuitExercise, CircuitRoundSet)
 from ..utils import lbs_to_kg
 
@@ -91,6 +92,7 @@ def log_strength():
             duration_minutes=int(f['duration_minutes']) if f.get('duration_minutes') else None,
             calories=int(f['calories']) if f.get('calories') else None,
             avg_bpm=int(f['avg_bpm']) if f.get('avg_bpm') else None,
+            session_rpe=float(f['session_rpe']) if f.get('session_rpe') else None,
             notes=f.get('notes'),
             completed_at=datetime.fromisoformat(f['completed_at']) if f.get('completed_at') else datetime.utcnow()
         )
@@ -266,9 +268,16 @@ def htmx_interval_row():
     return render_template('partials/interval_row.html', index=index)
 
 
-# ── Log Hyrox ──────────────────────────────────────────────
-@workouts_bp.route('/log/hyrox', methods=['GET', 'POST'])
+# ── Hyrox Start (selection page) ───────────────────────────
+@workouts_bp.route('/log/hyrox')
 def log_hyrox():
+    return render_template('workouts/hyrox_select.html',
+                           training_presets=HYROX_TRAINING_PRESETS)
+
+
+# ── Log Hyrox Race ─────────────────────────────────────────
+@workouts_bp.route('/log/hyrox/race', methods=['GET', 'POST'])
+def log_hyrox_race():
     if request.method == 'POST':
         f = request.form
         workout = Workout(
@@ -295,35 +304,80 @@ def log_hyrox():
         db.session.add(result)
         db.session.flush()
 
-        i = 0
-        while f.get(f'stations[{i}][name]'):
-            weight_raw = float(f[f'stations[{i}][weight]']) if f.get(f'stations[{i}][weight]') else None
-            unit = f.get(f'stations[{i}][unit]', 'lbs')
-            weight_kg = weight_lbs = None
-            if weight_raw:
-                if unit == 'lbs':
-                    weight_lbs = weight_raw; weight_kg = lbs_to_kg(weight_raw)
-                else:
-                    weight_kg = weight_raw; weight_lbs = weight_raw * 2.20462
-            db.session.add(HyroxStation(
-                hyrox_result_id = result.id,
-                station_order   = i + 1,
-                station_name    = f[f'stations[{i}][name]'],
-                time_s          = _time_to_seconds(f.get(f'stations[{i}][time]')),
-                weight_kg       = weight_kg,
-                weight_lbs      = weight_lbs,
-                distance_m      = int(f[f'stations[{i}][distance_m]']) if f.get(f'stations[{i}][distance_m]') else None,
-                reps            = int(f[f'stations[{i}][reps]']) if f.get(f'stations[{i}][reps]') else None,
-                notes           = f.get(f'stations[{i}][notes]'),
-            ))
-            i += 1
-
+        _save_hyrox_stations(result.id, f)
         db.session.commit()
         return redirect(url_for('workouts.view', workout_id=workout.id))
 
+    race_type = request.args.get('race_type', 'singles')
     return render_template('workouts/log_hyrox.html',
+                           session_mode='race',
+                           race_type=race_type,
                            default_stations=HYROX_DEFAULT_STATIONS,
                            locations=LOCATION_CHOICES)
+
+
+# ── Log Hyrox Training ─────────────────────────────────────
+@workouts_bp.route('/log/hyrox/training', methods=['GET', 'POST'])
+def log_hyrox_training():
+    preset_key = request.args.get('preset', 'full_sim')
+    preset     = HYROX_TRAINING_PRESETS.get(preset_key, HYROX_TRAINING_PRESETS['full_sim'])
+
+    if request.method == 'POST':
+        f = request.form
+        workout = Workout(
+            workout_type='hyrox',
+            name=f.get('name', preset['default_name']),
+            location=f.get('location', 'gym'),
+            duration_minutes=int(f['duration_minutes']) if f.get('duration_minutes') else None,
+            calories=int(f['calories']) if f.get('calories') else None,
+            avg_bpm=int(f['avg_bpm']) if f.get('avg_bpm') else None,
+            notes=f.get('notes'),
+            completed_at=datetime.fromisoformat(f['completed_at']) if f.get('completed_at') else datetime.utcnow()
+        )
+        db.session.add(workout)
+        db.session.flush()
+
+        result = HyroxResult(
+            workout_id     = workout.id,
+            total_time_s   = _time_to_seconds(f.get('total_time')),
+            running_time_s = _time_to_seconds(f.get('running_time')),
+            workout_time_s = _time_to_seconds(f.get('workout_time')),
+            location       = f.get('venue'),
+            race_type      = f'training_{preset_key}',
+        )
+        db.session.add(result)
+        db.session.flush()
+
+        _save_hyrox_stations(result.id, f)
+        db.session.commit()
+
+        program_day_id = f.get('program_day_id')
+        if program_day_id:
+            from ..models import ProgramCompletion, ProgramDay
+            day = ProgramDay.query.get(int(program_day_id))
+            if day:
+                comp = ProgramCompletion.query.filter_by(day_id=day.id).first()
+                if not comp:
+                    comp = ProgramCompletion(day_id=day.id)
+                    db.session.add(comp)
+                comp.workout_id = workout.id
+                comp.completed  = True
+                comp.status     = 'done'
+                comp.done_date  = workout.completed_at.date()
+                db.session.commit()
+                return redirect(url_for('program.week',
+                    program_id=day.program_id, week_num=day.week_number))
+
+        return redirect(url_for('workouts.view', workout_id=workout.id))
+
+    program_day_id = request.args.get('program_day_id')
+    return render_template('workouts/log_hyrox.html',
+                           session_mode='training',
+                           preset=preset,
+                           default_stations=preset['stations'],
+                           locations=LOCATION_CHOICES,
+                           program_day_id=program_day_id,
+                           weight_unit=session.get('weight_unit', 'lbs'))
 
 
 # ── Log Circuit / AMRAP ────────────────────────────────────
@@ -463,6 +517,34 @@ def export_csv():
     )
 
 # ── Helpers ────────────────────────────────────────────────
+def _save_hyrox_stations(result_id, f):
+    i = 0
+    while f.get(f'stations[{i}][name]'):
+        if f.get(f'stations[{i}][skipped]'):
+            i += 1
+            continue
+        weight_raw = float(f[f'stations[{i}][weight]']) if f.get(f'stations[{i}][weight]') else None
+        unit = f.get(f'stations[{i}][unit]', 'lbs')
+        weight_kg = weight_lbs = None
+        if weight_raw:
+            if unit == 'lbs':
+                weight_lbs = weight_raw; weight_kg = lbs_to_kg(weight_raw)
+            else:
+                weight_kg = weight_raw; weight_lbs = weight_raw * 2.20462
+        db.session.add(HyroxStation(
+            hyrox_result_id = result_id,
+            station_order   = i + 1,
+            station_name    = f[f'stations[{i}][name]'],
+            time_s          = _time_to_seconds(f.get(f'stations[{i}][time]')),
+            weight_kg       = weight_kg,
+            weight_lbs      = weight_lbs,
+            distance_m      = int(f[f'stations[{i}][distance_m]']) if f.get(f'stations[{i}][distance_m]') else None,
+            reps            = int(f[f'stations[{i}][reps]']) if f.get(f'stations[{i}][reps]') else None,
+            notes           = f.get(f'stations[{i}][notes]'),
+        ))
+        i += 1
+
+
 def _time_to_seconds(t):
     """Parse MM:SS or HH:MM:SS to seconds."""
     if not t or not t.strip():
@@ -493,6 +575,7 @@ def edit(workout_id):
         workout.duration_minutes = int(f['duration_minutes']) if f.get('duration_minutes') else None
         workout.calories         = int(f['calories'])         if f.get('calories')         else None
         workout.avg_bpm          = int(f['avg_bpm'])          if f.get('avg_bpm')          else None
+        workout.session_rpe      = float(f['session_rpe'])    if f.get('session_rpe')      else None
         workout.notes            = f.get('notes')
         if f.get('completed_at'):
             workout.completed_at = datetime.fromisoformat(f['completed_at'])

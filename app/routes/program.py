@@ -182,6 +182,20 @@ def start_day(day_id):
     """Pre-populate a strength log form with exercises from this program day."""
     day     = ProgramDay.query.get_or_404(day_id)
     program = Program.query.get(day.program_id)
+
+    # Route Hyrox-labelled days to the Hyrox training logger
+    day_name_lower = (day.name or '').lower()
+    if 'hyrox' in day_name_lower:
+        preset_key = 'full_sim'
+        if 'half' in day_name_lower:
+            preset_key = 'half_sim_b' if (' b' in day_name_lower or 'b side' in day_name_lower) else 'half_sim_a'
+        elif 'station' in day_name_lower or ('workout' in day_name_lower and 'sim' not in day_name_lower):
+            preset_key = 'workouts_only'
+        elif 'run' in day_name_lower and 'sim' not in day_name_lower:
+            preset_key = 'running_only'
+        return redirect(url_for('workouts.log_hyrox_training',
+                                preset=preset_key, program_day_id=day_id))
+
     try:
         exercise_names = json.loads(day.exercises) if day.exercises else []
     except Exception:

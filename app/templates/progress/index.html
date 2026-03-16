@@ -16,6 +16,11 @@
 <!-- ── STRENGTH TAB ── -->
 <div id="pane-strength">
   <div class="card" style="margin-bottom:12px;">
+    <div class="form-group" style="margin-bottom:8px;">
+      <label class="form-label">Filter Exercises</label>
+      <input type="text" id="exercise-filter" class="form-control" placeholder="Search by name or muscle group..."
+             oninput="filterExercises(this.value)"/>
+    </div>
     <div class="form-group" style="margin-bottom:0;">
       <label class="form-label">Select Exercise</label>
       <select id="exercise-select" class="form-control" onchange="loadStrengthChart(this.value)">
@@ -27,7 +32,7 @@
             <optgroup label="{{ ex.muscle_group or 'Other' }}">
             {% set current_group.v = ex.muscle_group %}
           {% endif %}
-          <option value="{{ ex.id }}">{{ ex.name }}</option>
+          <option value="{{ ex.id }}" data-group="{{ ex.muscle_group or '' }}">{{ ex.name }}</option>
         {% endfor %}
         {% if current_group.v %}</optgroup>{% endif %}
       </select>
@@ -76,7 +81,13 @@
   </div>
   {% endif %}
 
-  <!-- These divs always exist so JS never gets a null reference -->
+  <!-- Sub-tabs — revealed once data loads -->
+  <div id="benchmark-sub-tabs" class="pill-tabs" style="display:none;margin-bottom:12px;">
+    <a class="pill active" id="bmt-overall" onclick="showBenchmarkTab('overall')" href="#">Overall</a>
+    <a class="pill"        id="bmt-splits"  onclick="showBenchmarkTab('splits')"  href="#">Station Splits</a>
+  </div>
+
+  <!-- Overall view -->
   <div id="benchmark-chart-container" style="display:none;">
     <div class="card" style="margin-bottom:10px;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;">
@@ -87,7 +98,11 @@
     </div>
     <div id="benchmark-session-list"></div>
   </div>
-  <div id="benchmark-empty"   style="display:none;" class="card">
+
+  <!-- Station Splits view -->
+  <div id="benchmark-splits-container" style="display:none;"></div>
+
+  <div id="benchmark-empty" style="display:none;" class="card">
     <div style="text-align:center;padding:20px;color:var(--muted);">No attempts logged yet.</div>
   </div>
   <div id="benchmark-loading" style="display:none;text-align:center;padding:40px;color:var(--muted);">Loading...</div>
@@ -141,6 +156,21 @@ function switchTab(tab) {
   return false;
 }
 
+// ── Exercise filter ──────────────────────────────────────
+function filterExercises(query) {
+  const sel = document.getElementById('exercise-select');
+  const q = query.toLowerCase().trim();
+  [...sel.querySelectorAll('optgroup')].forEach(grp => {
+    let anyVisible = false;
+    [...grp.querySelectorAll('option')].forEach(opt => {
+      const matches = !q || opt.textContent.toLowerCase().includes(q) || (opt.dataset.group || '').toLowerCase().includes(q);
+      opt.style.display = matches ? '' : 'none';
+      if (matches) anyVisible = true;
+    });
+    grp.style.display = anyVisible ? '' : 'none';
+  });
+}
+
 // ── Strength chart ───────────────────────────────────────
 async function loadStrengthChart(exerciseId) {
   if (!exerciseId) return;
@@ -172,6 +202,19 @@ function renderStrengthChart() {
   const data   = strengthData;
   const unit   = WEIGHT_UNIT;
   const exName = document.getElementById('exercise-select').selectedOptions[0].text;
+
+  // 1RM needs at least 2 sessions to show a trend; show a helpful message if not
+  if (strengthMetric === '1rm' && data.length < 2) {
+    document.getElementById('strength-chart-container').style.display = 'none';
+    const emptyEl = document.getElementById('strength-empty');
+    emptyEl.querySelector('div').textContent = data.length === 0
+      ? 'No weight data for this exercise.'
+      : 'Log at least 2 sessions to see your Est. 1RM trend. Your current estimate: '
+        + (unit === 'lbs' ? data[0].est_1rm_lbs : data[0].est_1rm_kg) + ' ' + unit + '.';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  document.getElementById('strength-empty').style.display = 'none';
 
   let values, bestVal, titleSuffix, tickFmt, lineColor, bestLabel;
 
@@ -347,29 +390,51 @@ function buildLineChart(canvasId, labels, values, pointColors, lineColor, unitLa
 }
 
 // ── Benchmark chart ─────────────────────────────────────
-let benchmarkChart = null;
+let benchmarkChart   = null;
+let benchmarkData    = null;
+let benchmarkTab     = 'overall';
 
 async function loadBenchmarkChart(pwId) {
   if (!pwId) return;
-  document.getElementById('benchmark-chart-container').style.display = 'none';
-  document.getElementById('benchmark-empty').style.display            = 'none';
-  document.getElementById('benchmark-loading').style.display          = 'block';
+  document.getElementById('benchmark-chart-container').style.display   = 'none';
+  document.getElementById('benchmark-splits-container').style.display  = 'none';
+  document.getElementById('benchmark-sub-tabs').style.display          = 'none';
+  document.getElementById('benchmark-empty').style.display             = 'none';
+  document.getElementById('benchmark-loading').style.display           = 'block';
 
-  const res  = await fetch(`/benchmarks/data/${pwId}`);
-  const data = await res.json();
+  const res     = await fetch(`/benchmarks/data/${pwId}`);
+  benchmarkData = await res.json();
   document.getElementById('benchmark-loading').style.display = 'none';
 
-  if (!data.length) { document.getElementById('benchmark-empty').style.display = 'block'; return; }
+  const results = benchmarkData.results;
+  if (!results.length) { document.getElementById('benchmark-empty').style.display = 'block'; return; }
 
+  document.getElementById('benchmark-sub-tabs').style.display = 'flex';
+  renderBenchmarkOverall(benchmarkData);
+  renderBenchmarkSplits(benchmarkData);
+  showBenchmarkTab(benchmarkTab);
+}
+
+function showBenchmarkTab(tab) {
+  benchmarkTab = tab;
+  document.getElementById('benchmark-chart-container').style.display  = tab === 'overall' ? '' : 'none';
+  document.getElementById('benchmark-splits-container').style.display = tab === 'splits'  ? '' : 'none';
+  ['overall','splits'].forEach(t =>
+    document.getElementById(`bmt-${t}`).classList.toggle('active', t === tab)
+  );
+  return false;
+}
+
+function renderBenchmarkOverall(data) {
+  const results = data.results;
   const title   = document.getElementById('benchmark-select').selectedOptions[0].text;
-  const labels  = data.map(d => fmtDate(d.date));
-  const times   = data.map(d => d.total_s);
+  const labels  = results.map(d => fmtDate(d.date));
+  const times   = results.map(d => d.total_s);
   const bestS   = Math.min(...times.filter(Boolean));
-  const bestFmt = data.find(d => d.total_s === bestS)?.total_fmt || '';
+  const bestFmt = results.find(d => d.total_s === bestS)?.total_fmt || '';
 
   document.getElementById('benchmark-chart-title').textContent = title;
   document.getElementById('benchmark-chart-best').textContent  = `Best: ${bestFmt}`;
-  document.getElementById('benchmark-chart-container').style.display = 'block';
 
   const pointColors = times.map(t => t === bestS ? '#e8ff00' : '#ff4d00');
   if (benchmarkChart) benchmarkChart.destroy();
@@ -396,7 +461,7 @@ async function loadBenchmarkChart(pwId) {
         tooltip: {
           callbacks: {
             label: ctx => {
-              const d = data[ctx.dataIndex];
+              const d = results[ctx.dataIndex];
               return ` ${d.total_fmt}${d.completed ? '' : ' (DNF)'}`;
             }
           },
@@ -408,6 +473,7 @@ async function loadBenchmarkChart(pwId) {
         x: { grid: { color: '#1a1a1a' }, ticks: { color: '#666', font: { family: 'DM Mono', size: 11 } } },
         y: {
           reverse: true,
+          title: { display: true, text: 'Total Time (lower = faster)', color: '#555', font: { family: 'DM Mono', size: 10 } },
           grid: { color: '#1a1a1a' },
           ticks: {
             color: '#666', font: { family: 'DM Mono', size: 11 },
@@ -418,11 +484,11 @@ async function loadBenchmarkChart(pwId) {
     }
   });
 
-  // Session list
+  // Attempt list
   const list = document.getElementById('benchmark-session-list');
   list.innerHTML = '';
-  [...data].reverse().forEach(d => {
-    const isBest = d.total_s === bestS;
+  [...results].reverse().forEach(d => {
+    const isBest    = d.total_s === bestS;
     const bestBadge = isBest ? `<span style="font-family:monospace;font-size:10px;background:#e8ff00;color:#000;padding:2px 6px;border-radius:4px;">BEST</span>` : '';
     const dnfBadge  = !d.completed ? `<span style="font-family:monospace;font-size:10px;background:#ff444422;color:#ff4444;border:1px solid #ff444444;padding:2px 6px;border-radius:4px;">DNF</span>` : '';
     list.innerHTML += `<a href="/workouts/${d.workout_id}" style="display:block;text-decoration:none;color:var(--text);">
@@ -434,6 +500,99 @@ async function loadBenchmarkChart(pwId) {
         </div>
       </div></a>`;
   });
+}
+
+function renderBenchmarkSplits(data) {
+  const { stations, results } = data;
+  const container = document.getElementById('benchmark-splits-container');
+
+  if (!stations.length) {
+    container.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--muted);">No station data recorded.</div>';
+    return;
+  }
+
+  // Best time per station across all results
+  const bestPerStation = {};
+  stations.forEach(st => {
+    const times = results.map(r => r.splits[st.id]?.time_s).filter(Boolean);
+    bestPerStation[st.id] = times.length ? Math.min(...times) : null;
+  });
+
+  // Attempt column headers
+  const headerDates = results.map(r => fmtDate(r.date)).join('');
+
+  function fmtDelta(s) {
+    const abs = Math.abs(s);
+    if (abs < 60) return `${abs}s`;
+    return `${Math.floor(abs/60)}:${String(abs%60).padStart(2,'0')}`;
+  }
+
+  let html = '';
+  stations.forEach(st => {
+    const chips = results.map((r, i) => {
+      const split = r.splits[String(st.id)];
+      if (!split || !split.time_s) {
+        return `<div style="text-align:center;min-width:64px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">${fmtDate(r.date)}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);">—</div>
+        </div>`;
+      }
+
+      const isBest = split.time_s === bestPerStation[st.id];
+      // Find the most recent prior split for this station
+      const prev = results.slice(0, i).reverse().find(pr => pr.splits[String(st.id)]?.time_s)?.splits[String(st.id)]?.time_s;
+      let deltaHtml = '';
+      let borderStyle = 'border:1px solid var(--border);';
+      let bgStyle = '';
+
+      if (prev) {
+        const diff = split.time_s - prev;
+        if (diff < 0) {
+          deltaHtml  = `<div style="font-size:10px;color:#4caf50;margin-top:2px;">↑ ${fmtDelta(diff)}</div>`;
+          borderStyle = 'border:1px solid #4caf5055;';
+          bgStyle     = 'background:color-mix(in srgb,#4caf50 6%,var(--surface2));';
+        } else if (diff > 0) {
+          deltaHtml  = `<div style="font-size:10px;color:#ff6b6b;margin-top:2px;">↓ +${fmtDelta(diff)}</div>`;
+          borderStyle = 'border:1px solid #ff444455;';
+          bgStyle     = 'background:color-mix(in srgb,#ff4444 6%,var(--surface2));';
+        } else {
+          deltaHtml = `<div style="font-size:10px;color:var(--muted);margin-top:2px;">→</div>`;
+        }
+      }
+
+      if (isBest) {
+        borderStyle = 'border:1px solid #e8ff0066;';
+        bgStyle     = 'background:color-mix(in srgb,#e8ff00 8%,var(--surface2));';
+      }
+
+      const timeColor = isBest ? '#e8ff00' : 'var(--text)';
+      return `<div style="text-align:center;min-width:64px;padding:6px 8px;border-radius:8px;${borderStyle}${bgStyle}flex-shrink:0;">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px;">${fmtDate(r.date)}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:${timeColor};">${split.time_fmt}</div>
+        ${deltaHtml}
+      </div>`;
+    }).join('');
+
+    // Best time label
+    const best = bestPerStation[st.id];
+    const bestFmtStr = best ? fmtSecs(best) : '—';
+
+    html += `<div class="card card-sm" style="margin-bottom:8px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-weight:600;font-size:13px;">${st.name}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">best <span style="color:#e8ff00;">${bestFmtStr}</span></div>
+      </div>
+      <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;">${chips}</div>
+    </div>`;
+  });
+
+  container.innerHTML = html || '<div class="card" style="text-align:center;padding:20px;color:var(--muted);">No split data yet.</div>';
+}
+
+function fmtSecs(s) {
+  if (!s) return '—';
+  const m = Math.floor(s / 60), sec = s % 60;
+  return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
 // ── Helpers ──────────────────────────────────────────────

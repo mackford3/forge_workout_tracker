@@ -203,26 +203,72 @@ All tables live in the `forge` schema inside the `forge_workouts` database.
 - [ ] **Hyrox race comparison** — Side-by-side station breakdown across multiple races to track splits over time.
 - [ ] **Unraid Docker template** — One-click install via Unraid Community Applications.
 
-## Focused Testing Results
-🔥 Agent 1 — Hyrox/Circuit Athlete
-Overall: The Hyrox full race logger is well built — 16 stations, split times, race type. The PFT/benchmark flow is a genuinely useful idea. But there are friction points that would frustrate someone logging mid-race or right after.
-Issues found:
-1. Hyrox logger shows "Log Hyrox" but the header says it's for "race or training session" — these are very different things. A race has 16 stations in fixed order. A training simulation (like your Hyrox Sim days in the program) might be 4 rounds of a subset. Right now there's no way to log a partial simulation from the Hyrox screen — you'd have to use Circuit. That's confusing. Suggest adding a "Simulation" mode toggle that lets you skip stations.
-2. The circuit/AMRAP logger always says "⚡ AMRAP" in the header even when you select Circuit from the log modal. The title doesn't update — it's hardcoded. Small but jarring.
-3. Circuit logging requires HTMX to add exercises — the + Add Exercise button uses hx-get and fails silently if HTMX isn't loaded or has a network hiccup. At the gym on mobile data this is a real risk. Strength logging uses pure JS and always works.
-4. No way to log a Hyrox training simulation from the program week view. The "▶ Start" button only pre-populates strength exercises. If Friday's session is "Hyrox-Specific Simulation," tapping Start dumps you into a strength form with a list of text exercises like "4 Rounds: 800m Run" — you can't actually log times against them. You'd need to start a Circuit manually instead.
-5. PFT benchmark log form has no pre-fill from last attempt. When you go to log your second PFT, all the station time fields are blank. For a timed benchmark you'd want to see your previous splits as a reference target — "last time you did the row in 4:52, aim for sub 4:45."
-6. The benchmark progress chart Y-axis says "lower = better" conceptually but the axis itself has no label. First time you see it the direction feels wrong.
-7. Calories and BPM fields on the PFT log form are buried under Duration. For a race-style effort these matter and should be more prominent.
+## Future Enhancements
 
-💪 Agent 2 — Strength Athlete
-Overall: The strength logger is the most polished part of the app — set persistence, history strip, PR badges, 1RM estimates all work well. A few things break the flow at the gym.
-Issues found:
-1. The exercise history strip shows last session weight but the pre-fill only works if the strip HTML loads before you tap "Add Set." If you select an exercise and immediately tap Add Set before the fetch completes, the weight field is blank. On slow mobile data this happens constantly.
-2. Set cards scroll horizontally but "Add Set" is below the scroll area. After 4-5 sets on a small phone the Add Set button is visually separate from the sets — you have to scroll right to see set 4, then scroll back left to find the button. The button should float or follow the scroll.
-3. No way to reorder exercises once added. If you forget an exercise and add it later, it appears at the bottom. In a real workout you might superset exercises — there's no way to group or reorder them.
-4. RPE is on every set but there's no session-level RPE or difficulty rating. After a brutal workout you want to mark "this was a 9/10 day" not just per-set RPE.
-5. The "Start" button from the program week view pre-populates exercises by fuzzy-matching names, but if the match fails you get a blank exercise select. There's no visual indicator that the match failed — the label hint says "Program: Back Squat 4x8-10" but the select shows "Select exercise…" with no warning that it didn't find it.
-6. Progress page strength charts don't show the exercise's muscle group. When scrolling the "Select Exercise" dropdown looking for Goblet Squat, the grouping by muscle helps, but if you don't know which group it's in you're scrolling blind. A search/filter box on the dropdown would help.
-7. 1RM estimates show on the workout view but not in the progress chart. You can see "Est. 1RM: 185 lbs" on a specific workout, but the progress page's Est. 1RM tab should show how that estimate has trended — which it does, but only if you've logged the same exercise multiple times. First visit with a single session it shows nothing and gives no explanation.
-8. Editing a workout that was started from the program doesn't re-link to the program day. If you log a workout via ▶ Start, it links to the program completion. If you then edit that workout, the link is preserved — but if the edit changes the workout_type the link can break silently.
+Design and UX improvements identified for future iterations:
+
+- [ ] **Autosave / data-loss protection** — Persist in-progress log form state to `localStorage` so a browser refresh, accidental navigation, or app switch doesn't wipe unsaved sets. Restore on next visit with a banner offering to resume or discard.
+- [ ] **Weight unit toggle without reload** — Switch between lbs and kg client-side by converting all displayed values in place, instead of a full page reload. Requires storing both values in the DOM and swapping on toggle.
+- [ ] **"Log again" shortcut from history** — A button on each workout history row (or on the workout view page) that opens the log form pre-filled with the same exercises, sets, and session config from that workout.
+- [ ] **Context-aware dashboard header** — Replace the static greeting with a dynamic header that reflects recent activity: congratulates a streak milestone, notes a rest day, or surfaces the next planned workout.
+- [ ] **Workout type breakdown chart** — Replace the badge row on the dashboard with a small stacked bar or donut chart showing the split of workout types over the last 30/90 days.
+- [ ] **History search and filter** — Add a search box and type/date filters to the workout history page so specific sessions can be found quickly as history grows.
+- [ ] **History pagination (load more)** — Replace full list rendering with an initial page of ~20 workouts and an "Load More" button or infinite scroll, so the history page stays fast at scale.
+- [ ] **Delete from history rows** — Expose a swipe-to-delete or long-press delete option directly on history rows, so a mistaken log can be removed without navigating into the full workout view.
+- [ ] **add premade workouts for hyrox sims**
+- [ ] **add premade workouts for circuits**
+- [ ] **add premade workouts for strength**
+- [ ] **add premade plan for smolov jr  squats and Bench**
+
+
+## Focused Testing Results — Hyrox
+
+### ✅ Resolved
+
+**Race vs. Training split** — The Hyrox entry point is now a dedicated selection page (`hyrox_select.html`) with a Race / Training tab toggle. Race mode logs all 16 stations in official order. Training mode offers five presets: Full Simulation, Half Sim A, Half Sim B, Workouts Only, and Running Only — each with a fixed station subset. The logger header and badge correctly reflect the mode (RACE / TRAINING) and the form submit button updates accordingly.
+
+**Duration / Calories / BPM prominence** — These three fields now appear in a single 3-column grid row on both the race and training log forms. No longer buried under Duration alone.
+
+**Race type pre-selection** — The Start Race button URL updates live as the user selects Singles / Doubles / Relay, so the correct race type is passed through to the logger without an extra step.
+
+**Hyrox days route from program week view** — `start_day` now detects day names containing "hyrox" and redirects to the Hyrox training logger instead of the strength form. Preset is inferred from the day name (half sim A/B, station practice, running only, full sim). The `program_day_id` is threaded through as a hidden field and linked on save, so the program completion is recorded exactly the same way as a strength day.
+
+**PFT benchmark pre-fill from last attempt** — The log form now fetches the most recent `PremadeResult` and passes its per-station times to the template. Each station shows a "Last: X:XX" chip next to the Skip toggle, and the time input placeholder is set to the previous split so the target is visible before the athlete types anything.
+
+**Benchmark progress chart Y-axis label** — The Y-axis now shows "Total Time (lower = faster)" so the inverted direction is self-explanatory on first view.
+
+---
+
+**Training preset stations: skip toggle** — Each station card in training mode now has a Skip checkbox. Checking it dims the row and submits `stations[i][skipped]=1`. The `_save_hyrox_stations` helper skips any flagged station, so partial simulations log cleanly without empty station records.
+
+**Circuit/AMRAP header** — The header and subtitle are now conditional on `circuit_type`. Circuit shows "🔄 CIRCUIT / Structured Circuit Training"; AMRAP shows "⚡ AMRAP / As Many Rounds As Possible".
+
+**Circuit Add Exercise** — The HTMX `hx-get` dependency is removed. Exercises are embedded as a JSON array at page load and `addExercise()` builds the full row in vanilla JS using `insertAdjacentHTML`. Works offline and on flaky mobile data, identical to how the strength logger behaves.
+
+---
+
+
+
+## Resolved for Strength
+
+**History pre-fill race condition** — `loadHistory` now fills ALL empty weight inputs in the sets-row after the fetch completes, not just the first one. Sets added before the fetch resolves get backfilled when history arrives.
+
+**Add Set scroll isolation** — The "+ Add Set" button is now a flex item inside the horizontal scroll row, rendered as a `+` card. It scrolls with the sets so it's always visible next to the last set regardless of how many sets are present.
+
+**Exercise reorder** — Each exercise block header now has ↑/↓ arrow buttons. Tapping ↑/↓ moves the block up or down in the exercises container using `insertBefore`, so you can reorder at any time without removing and re-adding.
+
+**Session-level RPE** — A "Session RPE" field (1–10, step 0.5) now appears in the session info card alongside Duration, Calories, and Avg BPM on all three strength forms (log, program start, edit). Stored in `workouts.session_rpe NUMERIC(3,1)`. **DB migration required — see SQL below.**
+
+**Program exercise match failure indicator** — When `start_workout.html` pre-populates an exercise and the fuzzy match fails (exercise_id is null), the block gets an orange border and the program hint label shows "⚠ not found — select manually" in orange, making the failure impossible to miss.
+
+**Exercise search/filter on progress page** — A text filter input above the exercise dropdown on the Strength progress tab filters options in real time by exercise name or muscle group. Matching is case-insensitive across both the option text and the `data-group` attribute.
+
+**1RM empty state explanation** — When the Est. 1RM tab is selected with only 1 session logged, the empty state now shows: "Log at least 2 sessions to see your Est. 1RM trend. Your current estimate: X lbs." instead of a blank chart with no context.
+
+**Edit workout program link** — Investigated: the program completion link is preserved through edits. Changing `workout_type` in edit does not touch `ProgramCompletion` records (linked by `workout_id`, not type). No breaking behavior confirmed — resolved as false positive.
+
+---
+
+### DB Migration Required
+
+
