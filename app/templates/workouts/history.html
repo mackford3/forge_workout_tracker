@@ -2,6 +2,53 @@
 {% block title %}Workout History{% endblock %}
 
 {% block content %}
+<style>
+  .row-outer {
+    position: relative;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    overflow: hidden;
+    user-select: none;
+  }
+  .row-outer .workout-row {
+    margin-bottom: 0;
+    border-radius: 10px;
+    transition: transform 0.25s ease;
+    position: relative;
+    z-index: 2;
+    will-change: transform;
+  }
+  .del-zone {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 80px;
+    background: #cc2222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    transition: background 0.15s;
+  }
+  .del-zone:hover { background: #ff3333; }
+  .del-zone .del-btn {
+    background: none; border: none; color: #fff;
+    font-size: 22px; cursor: pointer; padding: 12px;
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  }
+  .del-confirm {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    background: var(--surface2);
+    border-left: 1px solid var(--border);
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    z-index: 3;
+  }
+  .del-confirm .btn { padding: 7px 12px; font-size: 12px; white-space: nowrap; }
+</style>
+
 <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-end;">
   <h1>HISTORY</h1>
   <a href="{{ url_for('workouts.export_csv') }}" class="btn btn-secondary btn-sm">⬇ Export CSV</a>
@@ -18,21 +65,36 @@
 
 {% if workouts.items %}
   {% for w in workouts.items %}
-  <a href="{{ url_for('workouts.view', workout_id=w.id) }}" class="workout-row">
-    <div>
-      {% if w.workout_type == 'strength+cardio' or (w.workout_type == 'strength' and w.cardio_sets.count() > 0) %}
-        <span class="badge badge-strength" style="font-size:9px;">strength</span>
-        <span class="badge badge-run" style="font-size:9px;margin-left:3px;">cardio</span>
-      {% else %}
-        <span class="badge badge-{{ w.workout_type }}">{{ w.workout_type }}</span>
-      {% endif %}
+  <div class="row-outer" id="row-{{ w.id }}">
+    <a href="{{ url_for('workouts.view', workout_id=w.id) }}" class="workout-row" id="link-{{ w.id }}">
+      <div>
+        {% if w.workout_type == 'strength+cardio' or (w.workout_type == 'strength' and w.cardio_sets.count() > 0) %}
+          <span class="badge badge-strength" style="font-size:9px;">strength</span>
+          <span class="badge badge-run" style="font-size:9px;margin-left:3px;">cardio</span>
+        {% else %}
+          <span class="badge badge-{{ w.workout_type }}">{{ w.workout_type }}</span>
+        {% endif %}
+      </div>
+      <div class="wr-info">
+        <div class="wr-name">{{ w.name }}</div>
+        <div class="wr-meta">{{ w.completed_at.strftime('%a %b %-d, %Y') }}</div>
+      </div>
+      <div class="wr-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </a>
+
+    <!-- Delete zone (swipe reveals on mobile, always visible on desktop hover) -->
+    <div class="del-zone" id="del-zone-{{ w.id }}">
+      <button class="del-btn" onclick="askDel({{ w.id }})" title="Delete">🗑️</button>
     </div>
-    <div class="wr-info">
-      <div class="wr-name">{{ w.name }}</div>
-      <div class="wr-meta">{{ w.completed_at.strftime('%a %b %-d, %Y') }}</div>
+
+    <!-- Confirmation panel -->
+    <div class="del-confirm" id="del-confirm-{{ w.id }}">
+      <button class="btn btn-secondary" onclick="cancelDel({{ w.id }})">Cancel</button>
+      <form method="post" action="{{ url_for('workouts.delete', workout_id=w.id) }}" style="margin:0;">
+        <button type="submit" class="btn btn-danger">Yes, Delete</button>
+      </form>
     </div>
-    <div class="wr-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></div>
-  </a>
+  </div>
   {% endfor %}
 
   <!-- Pagination -->
@@ -52,4 +114,69 @@
     <div style="color:var(--muted);font-size:13px;">Tap the + button to log your first workout</div>
   </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const SWIPE_THRESHOLD = 60;
+
+  function askDel(id) {
+    document.getElementById('del-zone-' + id).style.display = 'none';
+    const conf = document.getElementById('del-confirm-' + id);
+    conf.style.display = 'flex';
+    // Expand row to show confirmation
+    document.getElementById('link-' + id).style.transform = 'translateX(-' + conf.offsetWidth + 'px)';
+  }
+
+  function cancelDel(id) {
+    document.getElementById('del-confirm-' + id).style.display = 'none';
+    document.getElementById('del-zone-' + id).style.display = 'flex';
+    resetRow(id);
+  }
+
+  function resetRow(id) {
+    document.getElementById('link-' + id).style.transform = 'translateX(0)';
+    document.getElementById('del-zone-' + id).style.display = 'flex';
+  }
+
+  // Touch swipe support
+  document.querySelectorAll('.row-outer').forEach(outer => {
+    const id = outer.id.replace('row-', '');
+    const link = outer.querySelector('.workout-row');
+    let startX = 0, startY = 0, dragging = false;
+
+    outer.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dragging = false;
+    }, {passive: true});
+
+    outer.addEventListener('touchmove', e => {
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (!dragging && Math.abs(dy) > Math.abs(dx)) return; // vertical scroll
+      dragging = true;
+      if (dx < 0) {
+        link.style.transition = 'none';
+        link.style.transform = `translateX(${Math.max(dx, -80)}px)`;
+      }
+    }, {passive: true});
+
+    outer.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - startX;
+      link.style.transition = 'transform 0.25s ease';
+      if (dragging && dx < -SWIPE_THRESHOLD) {
+        link.style.transform = 'translateX(-80px)';
+      } else if (dragging) {
+        link.style.transform = 'translateX(0)';
+      }
+    });
+
+    // Prevent navigation if row was dragged
+    link.addEventListener('click', e => {
+      const current = parseInt(link.style.transform.replace(/[^-\d]/g, '') || '0');
+      if (current < -10) e.preventDefault();
+    });
+  });
+</script>
 {% endblock %}

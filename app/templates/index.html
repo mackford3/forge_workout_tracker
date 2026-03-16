@@ -3,8 +3,22 @@
 
 {% block content %}
 <div class="page-header">
-  <h1>{{ year }} STATS</h1>
-  <p>Your year at a glance</p>
+  {% if current_streak >= 7 %}
+    <h1>{{ current_streak }} DAYS 🔥</h1>
+    <p>You're on fire. Don't break the chain.</p>
+  {% elif current_streak >= 3 %}
+    <h1>{{ current_streak }}-DAY STREAK</h1>
+    <p>Consistency is building. Keep showing up.</p>
+  {% elif days_since_last == 0 %}
+    <h1>GREAT WORK</h1>
+    <p>You trained today. Recover well.</p>
+  {% elif today_program_day %}
+    <h1>{{ year }} STATS</h1>
+    <p>Next up: {{ today_program_day.name }}</p>
+  {% else %}
+    <h1>{{ year }} STATS</h1>
+    <p>Your year at a glance</p>
+  {% endif %}
 </div>
 
 <!-- YTD Stats -->
@@ -14,14 +28,16 @@
     <div class="stat-label">Workouts</div>
   </div>
   <div class="stat-box">
-    <div class="stat-val" style="font-size:24px;">
+    <div class="stat-val" style="font-size:24px;"
+         data-lbs="{{ ytd_weight|int }}"
+         data-kg="{{ (ytd_weight / 2.20462)|int }}">
       {% if weight_unit == 'lbs' %}
         {{ "{:,.0f}".format(ytd_weight) }}
       {% else %}
         {{ "{:,.0f}".format(ytd_weight / 2.20462) }}
       {% endif %}
     </div>
-    <div class="stat-label">{{ weight_unit }} Lifted</div>
+    <div class="stat-label" data-unit-label>{{ weight_unit }} Lifted</div>
   </div>
   <div class="stat-box">
     <div class="stat-val">{{ "%.1f"|format(ytd_distance) }}</div>
@@ -66,11 +82,21 @@
 </div>
 {% endif %}
 
-<!-- Type + location badges -->
+<!-- Type breakdown chart + location badges -->
+{% set total_w = type_counts.values()|sum %}
+{% if total_w > 0 %}
 <div class="card card-sm" style="margin-bottom:12px;">
+  <!-- Stacked bar -->
+  <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-bottom:10px;gap:1px;">
+    {% for wtype, count in type_counts.items() %}
+      {% set color = 'var(--' + ('strength' if wtype == 'strength+cardio' else wtype) + ')' %}
+      <div style="flex:{{ count }};background:{{ color }};opacity:0.85;" title="{{ wtype }}: {{ count }}"></div>
+    {% endfor %}
+  </div>
+  <!-- Labels row -->
   <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
     {% for wtype, count in type_counts.items() %}
-      <span class="badge badge-{{ wtype }}">{{ wtype }} × {{ count }}</span>
+      <span class="badge badge-{{ 'mixed' if wtype == 'strength+cardio' else wtype }}">{{ wtype }} × {{ count }}</span>
     {% endfor %}
     {% for loc, count in location_counts.items() %}
       <span class="badge" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);">
@@ -79,6 +105,7 @@
     {% endfor %}
   </div>
 </div>
+{% endif %}
 
 <hr class="divider">
 

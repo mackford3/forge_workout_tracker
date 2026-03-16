@@ -124,6 +124,7 @@ def index():
         longest_streak = max(longest_streak, run)
 
     last_workout = Workout.query.order_by(Workout.completed_at.desc()).first()
+    days_since_last = (today - last_workout.completed_at.date()).days if last_workout else None
     active_plan  = WorkoutPlan.query.filter_by(is_active=True).first()
     recent_workouts = Workout.query.order_by(Workout.completed_at.desc()).limit(6).all()
 
@@ -165,6 +166,7 @@ def index():
         longest_streak=longest_streak,
         today_program=today_program,
         today_program_day=today_program_day,
+        days_since_last=days_since_last,
     )
 
 @main_bp.route('/set-unit/<unit>')
