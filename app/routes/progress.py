@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify
 from ..models import db, Exercise, WorkoutSet, Workout
 from sqlalchemy import func
+from datetime import datetime, timedelta
 
 progress_bp = Blueprint('progress', __name__)
 
@@ -10,13 +11,61 @@ def index():
     exercises = Exercise.query.filter(
         Exercise.category == 'strength'
     ).order_by(Exercise.name).all()
+
+    # ── Hero stats (no selection needed) ──────────────────
+    total_workouts = Workout.query.count()
+    week_start     = datetime.utcnow() - timedelta(days=7)
+    month_start    = datetime.utcnow() - timedelta(days=30)
+    week_workouts  = Workout.query.filter(Workout.completed_at >= week_start).count()
+    month_workouts = Workout.query.filter(Workout.completed_at >= month_start).count()
+
+    # Streak — consecutive days from today backwards
+    all_dates = sorted(set(
+        w.completed_at.date()
+        for w in Workout.query.order_by(Workout.completed_at.desc()).limit(100).all()
+    ), reverse=True)
+    streak = 0
+    today = datetime.utcnow().date()
+    check = today
+    for d in all_dates:
+        if d == check or d == check - timedelta(days=1):
+            streak += 1
+            check = d - timedelta(days=1)
+        elif d < check - timedelta(days=1):
+            break
+
+    # Recent PRs — top 6 exercises by most recently logged max weight
+    recent_prs = (
+        db.session.query(
+            Exercise.name,
+            Exercise.id,
+            func.max(WorkoutSet.weight_lbs).label('max_lbs'),
+            func.max(Workout.completed_at).label('last_date')
+        )
+        .join(WorkoutSet, WorkoutSet.exercise_id == Exercise.id)
+        .join(Workout, Workout.id == WorkoutSet.workout_id)
+        .filter(WorkoutSet.skipped == False, WorkoutSet.weight_lbs != None)
+        .group_by(Exercise.id, Exercise.name)
+        .order_by(func.max(Workout.completed_at).desc())
+        .limit(6)
+        .all()
+    )
+
     try:
         from ..models import PremadeWorkout
         premade_workouts = PremadeWorkout.query.order_by(PremadeWorkout.name).all()
     except Exception:
         premade_workouts = []
-    return render_template('progress/index.html', exercises=exercises,
-                           premade_workouts=premade_workouts)
+
+    return render_template('progress/index.html',
+        exercises=exercises,
+        premade_workouts=premade_workouts,
+        total_workouts=total_workouts,
+        week_workouts=week_workouts,
+        month_workouts=month_workouts,
+        recent_prs=recent_prs,
+        streak=streak,
+    )
 
 
 @progress_bp.route('/data')

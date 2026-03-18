@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Edit Exercise{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;gap:12px;">
+  <a href="{{ url_for('exercises.index') }}" class="btn btn-secondary btn-sm">← Back</a>
+  <h1>EDIT EXERCISE</h1>
+</div>
+
+<form method="post" action="{{ url_for('exercises.edit', ex_id=ex.id) }}">
+  <div class="card">
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-control" name="name" value="{{ ex.name }}" required/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Muscle Group</label>
+      <input class="form-control" name="muscle_group" value="{{ ex.muscle_group or '' }}" placeholder="e.g. Chest, Legs..."/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select class="form-control" name="category">
+        <option value="strength" {{ 'selected' if ex.category == 'strength' }}>Strength</option>
+        <option value="cardio" {{ 'selected' if ex.category == 'cardio' }}>Cardio</option>
+        <option value="mobility" {{ 'selected' if ex.category == 'mobility' }}>Mobility</option>
+        <option value="plyometric" {{ 'selected' if ex.category == 'plyometric' }}>Plyometric</option>
+      </select>
+    </div>
+  </div>
+  <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;">Save Changes ✓</button>
+</form>
+{% endblock %}

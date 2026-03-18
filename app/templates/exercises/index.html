@@ -10,9 +10,11 @@
   <a href="{{ url_for('exercises.new') }}" class="btn btn-primary btn-sm">+ Add</a>
 </div>
 
-<!-- Muscle group filter pills -->
+<!-- Filter pills -->
 <div class="pill-tabs" style="margin-bottom:16px;">
-  <a class="pill {{ 'active' if not muscle_filter }}" href="{{ url_for('exercises.index') }}">All</a>
+  <a class="pill {{ 'active' if not muscle_filter and not category_filter }}" href="{{ url_for('exercises.index') }}">All</a>
+  <a class="pill {{ 'active' if category_filter == 'cardio' }}" href="{{ url_for('exercises.index', category='cardio') }}">Cardio</a>
+  <a class="pill {{ 'active' if category_filter == 'mobility' }}" href="{{ url_for('exercises.index', category='mobility') }}">Mobility</a>
   {% for muscle in all_muscles %}
   <a class="pill {{ 'active' if muscle_filter == muscle }}"
      href="{{ url_for('exercises.index', muscle=muscle) }}">{{ muscle }}</a>
@@ -33,10 +35,13 @@
         <span style="font-size:12px;color:var(--muted);margin-left:8px;">{{ ex.muscle_group }}</span>
         {% endif %}
       </div>
-      <form method="post" action="{{ url_for('exercises.delete', ex_id=ex.id) }}"
-            onsubmit="return confirm('Delete {{ ex.name }}?')">
-        <button type="submit" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;" title="Delete">✕</button>
-      </form>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <a href="{{ url_for('exercises.edit', ex_id=ex.id) }}" style="color:var(--muted);font-size:13px;text-decoration:none;">Edit</a>
+        <form method="post" action="{{ url_for('exercises.delete', ex_id=ex.id) }}"
+              onsubmit="return confirm('Delete {{ ex.name }}?')">
+          <button type="submit" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;" title="Delete">✕</button>
+        </form>
+      </div>
     </div>
     {% endfor %}
   </div>
