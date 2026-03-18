@@ -1,10 +1,79 @@
 {% extends 'base.html' %}
 {% block title %}Progress{% endblock %}
 
+{% block head %}
+<style>
+  .progress-hero {
+    text-align: center;
+    padding: 28px 16px 20px;
+    margin-bottom: 20px;
+    background: radial-gradient(ellipse at center top, rgba(212,43,43,0.1) 0%, transparent 65%);
+    border-bottom: 1px solid var(--border);
+  }
+  .pr-card { transition: border-color .15s, transform .15s; }
+  .pr-card:hover { border-color: var(--accent) !important; transform: translateY(-1px); }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <h1>📈 PROGRESS</h1>
+
+<!-- ── Hero Banner ── -->
+<div class="progress-hero">
+  <div style="font-size:10px;font-weight:600;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">
+    YOUR STRENGTH RECORD
+  </div>
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:.06em;color:var(--accent);line-height:1;margin-bottom:4px;">
+    FORGE
+  </div>
+  <div style="font-size:12px;color:var(--muted);letter-spacing:.06em;">TRACK &nbsp;·&nbsp; IMPROVE &nbsp;·&nbsp; DOMINATE</div>
 </div>
+
+<!-- ── Stat Strip ── -->
+<div class="stat-grid" style="margin-bottom:20px;">
+  <div class="stat-box">
+    <div class="stat-val" style="font-size:28px;">{{ total_workouts }}</div>
+    <div class="stat-lbl">Total</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val" style="font-size:28px;color:var(--accent);">{{ streak }}</div>
+    <div class="stat-lbl">Streak 🔥</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val" style="font-size:28px;">{{ week_workouts }}</div>
+    <div class="stat-lbl">This Week</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-val" style="font-size:28px;">{{ month_workouts }}</div>
+    <div class="stat-lbl">This Month</div>
+  </div>
+</div>
+
+<!-- ── Recent PRs ── -->
+{% if recent_prs %}
+<div style="margin-bottom:24px;">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.06em;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+    <span style="color:var(--accent);">⚔</span> RECENT PERSONAL RECORDS
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    {% for pr in recent_prs %}
+    <div class="card card-sm pr-card"
+         onclick="switchTab('strength');loadStrengthChartById({{ pr.id }});"
+         style="cursor:pointer;border-left:3px solid var(--accent);padding-left:14px;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;">
+        {{ pr.last_date.strftime('%b %d') if pr.last_date else '' }}
+      </div>
+      <div style="font-weight:600;font-size:13px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ pr.name }}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:17px;color:var(--accent);font-weight:700;">
+        {{ '%.1f'|format(pr.max_lbs) }} lbs
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Drill-down Tabs ── -->
+<div style="font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:10px;">DEEP DIVE</div>
 
 <!-- Tabs -->
 <div class="pill-tabs" style="margin-bottom:16px;">
@@ -145,6 +214,13 @@ let runData       = null;
 let runMetric     = 'distance';
 let activeTab     = 'strength';
 
+// ── PR card shortcut ─────────────────────────────────────
+function loadStrengthChartById(exerciseId) {
+  const sel = document.getElementById('exercise-select');
+  if (sel) sel.value = exerciseId;
+  loadStrengthChart(exerciseId);
+}
+
 // ── Tab switching ────────────────────────────────────────
 function switchTab(tab) {
   activeTab = tab;
@@ -223,26 +299,26 @@ function renderStrengthChart() {
     bestVal     = Math.max(...values);
     titleSuffix = `Max Weight`;
     tickFmt     = v => `${v} ${unit}`;
-    lineColor   = '#e8ff00';
+    lineColor   = '#D42B2B';
     bestLabel   = `PR: ${bestVal} ${unit}`;
   } else if (strengthMetric === 'volume') {
     values      = data.map(d => unit === 'lbs' ? d.volume_lbs : d.volume_kg);
     bestVal     = Math.max(...values);
     titleSuffix = `Volume`;
     tickFmt     = v => `${v.toLocaleString()} ${unit}`;
-    lineColor   = '#b44dff';
+    lineColor   = '#A855F7';
     bestLabel   = `Best: ${bestVal.toLocaleString()} ${unit}`;
   } else {
     values      = data.map(d => unit === 'lbs' ? d.est_1rm_lbs : d.est_1rm_kg);
     bestVal     = Math.max(...values);
     titleSuffix = `Est. 1RM`;
     tickFmt     = v => `${v} ${unit}`;
-    lineColor   = '#ff4d00';
+    lineColor   = '#FF6600';
     bestLabel   = `Best 1RM: ${bestVal} ${unit}`;
   }
 
   const labels = data.map(d => fmtDate(d.date));
-  const pointColors = values.map(v => v === bestVal ? '#ff4d00' : lineColor);
+  const pointColors = values.map(v => v === bestVal ? '#FFFFFF' : lineColor);
 
   document.getElementById('strength-chart-title').textContent = exName;
   document.getElementById('strength-chart-pr').textContent    = bestLabel;
@@ -263,13 +339,13 @@ function renderStrengthChart() {
       `<span style="font-family:'DM Mono',monospace;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;">${s.lbs}${unit} × ${s.reps||'?'}</span>`
     ).join(' ');
     const badge = isBest
-      ? `<span style="font-family:'DM Mono',monospace;font-size:10px;background:#ff4d00;color:#fff;padding:2px 6px;border-radius:4px;">${strengthMetric==='weight'?'PR':strengthMetric==='volume'?'PEAK VOL':'BEST 1RM'}</span>`
+      ? `<span style="font-family:'DM Mono',monospace;font-size:10px;background:var(--accent);color:#fff;padding:2px 6px;border-radius:4px;">${strengthMetric==='weight'?'PR':strengthMetric==='volume'?'PEAK VOL':'BEST 1RM'}</span>`
       : '';
     const dispStr = strengthMetric === 'volume'
       ? `${dispVal.toLocaleString()} ${unit}`
       : `${dispVal} ${unit}`;
     list.innerHTML += `<a href="/workouts/${d.workout_id}" style="display:block;text-decoration:none;color:var(--text);">
-      <div class="card card-sm" style="margin-bottom:8px;${isBest?'border-color:#ff4d00;':''}">
+      <div class="card card-sm" style="margin-bottom:8px;${isBest?'border-left:3px solid var(--accent);':''}">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
           <span style="font-size:13px;color:var(--muted);">${fmtDateLong(d.date)}</span>
           ${badge}
@@ -307,7 +383,7 @@ function renderRunChart() {
   const values  = runData.map(d => isDistance ? d.distance_km : d.pace_s);
   const labels  = runData.map(d => fmtDate(d.date));
   const bestVal = isDistance ? Math.max(...values) : Math.min(...values.filter(Boolean));
-  const color   = '#00e5ff';
+  const color   = '#00D4FF';
 
   document.getElementById('run-chart-title').textContent =
     isDistance ? 'Distance (km)' : 'Pace (min/km)';
@@ -315,10 +391,7 @@ function renderRunChart() {
     isDistance ? `Best: ${bestVal.toFixed(2)} km` : `Best: ${fmtPace(bestVal)} /km (lower = faster)`;
   document.getElementById('run-chart-container').style.display = 'block';
 
-  const pointColors = values.map(v =>
-    isDistance ? (v === bestVal ? '#ff4d00' : color)
-               : (v === bestVal ? '#ff4d00' : color)
-  );
+  const pointColors = values.map(v => v === bestVal ? '#FFFFFF' : color);
 
   if (runChart) runChart.destroy();
   // For pace, invert axis (lower = better)
@@ -333,13 +406,13 @@ function renderRunChart() {
   [...runData].reverse().forEach(d => {
     const isBest = isDistance ? d.distance_km === bestVal : d.pace_s === bestVal;
     list.innerHTML += `<a href="/workouts/${d.workout_id}" style="display:block;text-decoration:none;color:var(--text);">
-      <div class="card card-sm" style="margin-bottom:8px;${isBest?'border-color:#ff4d00;':''}">
+      <div class="card card-sm" style="margin-bottom:8px;${isBest?'border-left:3px solid var(--accent);':''}">
         <div style="display:flex;align-items:center;gap:8px;">
           <div>
             <div style="font-size:13px;color:var(--muted);">${fmtDateLong(d.date)}</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;">${d.workout_name}</div>
           </div>
-          ${isBest?'<span style="font-family:\'DM Mono\',monospace;font-size:10px;background:#ff4d00;color:#fff;padding:2px 6px;border-radius:4px;">BEST</span>':''}
+          ${isBest?'<span style="font-family:\'DM Mono\',monospace;font-size:10px;background:var(--accent);color:#fff;padding:2px 6px;border-radius:4px;">BEST</span>':''}
           <div style="margin-left:auto;text-align:right;">
             <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--run);">${d.distance_km.toFixed(2)} km</div>
             ${d.pace_str ? `<div style="font-size:11px;color:var(--muted);">${d.pace_str}/km</div>` : ''}
@@ -353,6 +426,11 @@ function renderRunChart() {
 // ── Chart factory ────────────────────────────────────────
 function buildLineChart(canvasId, labels, values, pointColors, lineColor, unitLabel, tickFmt, reverseY=false) {
   const ctx = document.getElementById(canvasId).getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 260);
+  gradient.addColorStop(0, lineColor.startsWith('#')
+    ? lineColor + '40'
+    : lineColor.replace('rgb(', 'rgba(').replace(')', ',0.25)'));
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
   return new Chart(ctx, {
     type: 'line',
     data: {
@@ -360,29 +438,33 @@ function buildLineChart(canvasId, labels, values, pointColors, lineColor, unitLa
       datasets: [{
         data: values,
         borderColor: lineColor,
-        backgroundColor: lineColor.replace(')', ',0.08)').replace('rgb','rgba'),
+        backgroundColor: gradient,
         pointBackgroundColor: pointColors,
+        pointBorderColor: 'transparent',
         pointRadius: 5,
+        pointHoverRadius: 7,
         tension: 0.3,
         fill: true,
+        borderWidth: 2,
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: true,
+      animation: { duration: 600, easing: 'easeOutQuart' },
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1a1a1a', borderColor: '#2a2a2a', borderWidth: 1,
-          titleColor: lineColor, bodyColor: '#f0f0f0', padding: 12,
+          backgroundColor: '#1C1C1F', borderColor: '#2A2A2E', borderWidth: 1,
+          titleColor: lineColor, bodyColor: '#EBEBEB', padding: 12,
         }
       },
       scales: {
-        x: { grid: { color: '#1a1a1a' }, ticks: { color: '#666', font: { family: 'DM Mono', size: 11 } } },
+        x: { grid: { color: '#1C1C1F' }, ticks: { color: '#555', font: { family: 'DM Mono', size: 11 } } },
         y: {
           reverse: reverseY,
-          grid: { color: '#1a1a1a' },
-          ticks: { color: '#666', font: { family: 'DM Mono', size: 11 }, callback: tickFmt }
+          grid: { color: '#1C1C1F' },
+          ticks: { color: '#555', font: { family: 'DM Mono', size: 11 }, callback: tickFmt }
         }
       }
     }
@@ -436,7 +518,7 @@ function renderBenchmarkOverall(data) {
   document.getElementById('benchmark-chart-title').textContent = title;
   document.getElementById('benchmark-chart-best').textContent  = `Best: ${bestFmt}`;
 
-  const pointColors = times.map(t => t === bestS ? '#e8ff00' : '#ff4d00');
+  const pointColors = times.map(t => t === bestS ? '#FFFFFF' : '#FF6600');
   if (benchmarkChart) benchmarkChart.destroy();
 
   const ctx = document.getElementById('benchmark-chart').getContext('2d');
@@ -446,8 +528,8 @@ function renderBenchmarkOverall(data) {
       labels,
       datasets: [{
         data: times,
-        borderColor: '#ff4d00',
-        backgroundColor: 'rgba(255,77,0,0.08)',
+        borderColor: '#FF6600',
+        backgroundColor: 'rgba(255,102,0,0.08)',
         pointBackgroundColor: pointColors,
         pointRadius: 5,
         tension: 0.3,
@@ -466,7 +548,7 @@ function renderBenchmarkOverall(data) {
             }
           },
           backgroundColor: '#1a1a1a', borderColor: '#2a2a2a', borderWidth: 1,
-          titleColor: '#ff4d00', bodyColor: '#f0f0f0', padding: 12,
+          titleColor: '#FF6600', bodyColor: '#f0f0f0', padding: 12,
         }
       },
       scales: {
@@ -489,10 +571,10 @@ function renderBenchmarkOverall(data) {
   list.innerHTML = '';
   [...results].reverse().forEach(d => {
     const isBest    = d.total_s === bestS;
-    const bestBadge = isBest ? `<span style="font-family:monospace;font-size:10px;background:#e8ff00;color:#000;padding:2px 6px;border-radius:4px;">BEST</span>` : '';
+    const bestBadge = isBest ? `<span style="font-family:monospace;font-size:10px;background:#FF6600;color:#fff;padding:2px 6px;border-radius:4px;">BEST</span>` : '';
     const dnfBadge  = !d.completed ? `<span style="font-family:monospace;font-size:10px;background:#ff444422;color:#ff4444;border:1px solid #ff444444;padding:2px 6px;border-radius:4px;">DNF</span>` : '';
     list.innerHTML += `<a href="/workouts/${d.workout_id}" style="display:block;text-decoration:none;color:var(--text);">
-      <div class="card card-sm" style="margin-bottom:8px;${isBest ? 'border-color:#e8ff00;' : ''}">
+      <div class="card card-sm" style="margin-bottom:8px;${isBest ? 'border-left:3px solid #FF6600;' : ''}">
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:13px;color:var(--muted);">${fmtDateLong(d.date)}</span>
           ${bestBadge}${dnfBadge}

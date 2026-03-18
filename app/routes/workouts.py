@@ -458,7 +458,13 @@ def log_hyrox_training():
                            weight_unit=session.get('weight_unit', 'lbs'))
 
 
-# ── Log Circuit / AMRAP ────────────────────────────────────
+# ── Circuit hub (selection page) ────────────────────────────
+@workouts_bp.route('/log/circuit/hub')
+def log_circuit_hub():
+    return render_template('workouts/log_circuit_select.html')
+
+
+# ── Log Circuit / AMRAP / EMOM / For Time ──────────────────
 @workouts_bp.route('/log/circuit', methods=['GET', 'POST'])
 def log_circuit():
     exercises    = Exercise.query.order_by(Exercise.name).all()

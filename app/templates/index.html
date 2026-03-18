@@ -1,8 +1,35 @@
 {% extends 'base.html' %}
 {% block title %}FORGE — Dashboard{% endblock %}
 
+{% block head %}
+<style>
+  .home-hero {
+    text-align: center;
+    padding: 28px 16px 20px;
+    margin-bottom: 16px;
+    background: radial-gradient(ellipse at center top, rgba(212,43,43,0.1) 0%, transparent 65%);
+    border-bottom: 1px solid var(--border);
+  }
+  .home-hero h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 42px;
+    letter-spacing: .06em;
+    color: var(--accent);
+    line-height: 1;
+    margin: 0 0 4px;
+  }
+  .home-hero p {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0;
+    letter-spacing: .04em;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page-header">
+<div class="home-hero">
+  <div style="font-size:10px;font-weight:600;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">{{ year }} · FORGE</div>
   {% if current_streak >= 7 %}
     <h1>{{ current_streak }} DAYS 🔥</h1>
     <p>You're on fire. Don't break the chain.</p>
@@ -13,10 +40,10 @@
     <h1>GREAT WORK</h1>
     <p>You trained today. Recover well.</p>
   {% elif today_program_day %}
-    <h1>{{ year }} STATS</h1>
+    <h1>STAY THE COURSE</h1>
     <p>Next up: {{ today_program_day.name }}</p>
   {% else %}
-    <h1>{{ year }} STATS</h1>
+    <h1>TRACK · IMPROVE · DOMINATE</h1>
     <p>Your year at a glance</p>
   {% endif %}
 </div>

@@ -10,19 +10,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
     :root {
-      --bg:        #0a0a0a;
-      --surface:   #111111;
-      --surface2:  #1a1a1a;
-      --border:    #2a2a2a;
-      --accent:    #e8ff00;
-      --accent2:   #ff4d00;
-      --text:      #f0f0f0;
+      --bg:        #0D0D0D;
+      --surface:   #131315;
+      --surface2:  #1C1C1F;
+      --border:    #2A2A2E;
+      --accent:    #D42B2B;
+      --accent2:   #E8E8E8;
+      --text:      #EBEBEB;
       --muted:     #666;
-      --strength:  #e8ff00;
-      --run:       #00e5ff;
-      --hyrox:     #ff4d00;
-      --circuit:   #b44dff;
-      --amrap:     #ff006e;
+      --strength:  #D42B2B;
+      --run:       #00D4FF;
+      --hyrox:     #FF6600;
+      --circuit:   #A855F7;
+      --mobility:  #22C55E;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; }
@@ -283,6 +283,63 @@
       .stat-box .stat-val { font-size: 26px; }
       .log-grid { grid-template-columns: 1fr; }
     }
+    @media (min-width: 768px) {
+      .container { max-width: 800px; }
+      .log-grid  { grid-template-columns: 1fr 1fr 1fr; }
+      .stat-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
+      .card      { padding: 24px; }
+    }
+    @media (min-width: 1024px) {
+      .container { max-width: 960px; }
+      .log-grid  { grid-template-columns: repeat(4, 1fr); }
+      .topbar    { padding: 14px 32px; }
+    }
+
+    /* ── Animations ── */
+    @keyframes forge-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes glow-pulse {
+      0%, 100% { text-shadow: 0 0 8px rgba(212,43,43,0.4); }
+      50%       { text-shadow: 0 0 20px rgba(212,43,43,0.8), 0 0 40px rgba(212,43,43,0.3); }
+    }
+    @keyframes counter-rise {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes border-glow {
+      from { box-shadow: none; }
+      to   { box-shadow: 0 0 0 1px rgba(212,43,43,0.2), 0 2px 12px rgba(0,0,0,0.4); }
+    }
+
+    .card { animation: forge-in 0.2s ease-out both; }
+    .stat-box { animation: counter-rise 0.35s ease-out both; }
+
+    /* Stagger cards slightly */
+    .card:nth-child(2) { animation-delay: 0.04s; }
+    .card:nth-child(3) { animation-delay: 0.08s; }
+    .card:nth-child(4) { animation-delay: 0.12s; }
+
+    .log-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(212,43,43,0.2);
+    }
+
+    /* Active pill — crimson */
+    .pill.active, .pill:hover {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* Logo glow */
+    .topbar .logo { animation: glow-pulse 4s ease-in-out infinite; }
+
+    /* Stat box accent */
+    .stat-box { border-left: 3px solid transparent; }
+    .stat-box:first-child { border-left-color: var(--accent); }
   </style>
   {% block head %}{% endblock %}
 </head>
@@ -372,15 +429,10 @@
           <div class="lc-label" style="color:var(--hyrox)">Hyrox</div>
           <div class="lc-sub">Race · Stations · Time</div>
         </a>
-        <a href="{{ url_for('workouts.log_circuit') }}?type=circuit" class="log-card" style="border-color:color-mix(in srgb, var(--circuit) 30%, transparent)">
+        <a href="{{ url_for('workouts.log_circuit_hub') }}" class="log-card" style="border-color:color-mix(in srgb, var(--circuit) 30%, transparent)">
           <div class="lc-icon">🔄</div>
           <div class="lc-label" style="color:var(--circuit)">Circuit</div>
-          <div class="lc-sub">Rounds · Exercises</div>
-        </a>
-        <a href="{{ url_for('workouts.log_circuit') }}?type=amrap" class="log-card" style="border-color:color-mix(in srgb, var(--amrap) 30%, transparent)">
-          <div class="lc-icon">⚡</div>
-          <div class="lc-label" style="color:var(--amrap)">AMRAP</div>
-          <div class="lc-sub">As Many Rounds As Possible</div>
+          <div class="lc-sub">Circuit · AMRAP · EMOM · For Time</div>
         </a>
         <a href="{{ url_for('premade.index') }}" class="log-card" style="border-color:color-mix(in srgb, var(--hyrox) 30%, transparent)">
           <div class="lc-icon">🏁</div>
