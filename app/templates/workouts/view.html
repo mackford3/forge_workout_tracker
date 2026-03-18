@@ -135,7 +135,12 @@
                 {% endif %}
               </td>
               {% if has_weight %}
-              {% set is_pr = pr_map is defined and s.exercise_id in pr_map and s.weight_lbs and (s.weight_lbs|float == pr_map[s.exercise_id]) %}
+              {% set set_reps = s.reps if s.reps else 1 %}
+              {% set set_1rm = s.weight_lbs|float * (1 + set_reps / 30) %}
+              {% set is_pr = pr_map is defined and s.exercise_id in pr_map and s.weight_lbs
+                             and set_1rm > pr_map[s.exercise_id]
+                             and pr_best is defined and s.exercise_id in pr_best
+                             and set_1rm >= pr_best[s.exercise_id] %}
               <td style="padding:8px 6px;text-align:right;font-family:'DM Mono',monospace;font-size:15px;font-weight:600;">
                 {% if s.weight_lbs or s.weight_kg %}
                   {% if is_pr %}

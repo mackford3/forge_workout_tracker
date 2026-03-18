@@ -35,22 +35,43 @@ def history():
 def view(workout_id):
     workout = Workout.query.get_or_404(workout_id)
 
-    # Build PR map: for each exercise in this workout, what was the all-time
-    # max weight_lbs BEFORE (or on) this workout date?
-    # A set is a PR if its weight equals that all-time max.
-    pr_map = {}   # exercise_id -> all-time max weight_lbs (up to this workout)
+    # pr_map:  exercise_id -> best est. 1RM from workouts strictly BEFORE this one
+    # pr_best: exercise_id -> best est. 1RM achieved in THIS workout
+    # A set earns a PR badge only when its 1RM matches the workout best AND
+    # beats the previous best — so at most one set per exercise gets the badge.
+    pr_map  = {}
+    pr_best = {}
     if workout.workout_type == 'strength':
         ex_ids = db.session.query(WorkoutSet.exercise_id).filter_by(
             workout_id=workout.id).distinct().all()
         for (ex_id,) in ex_ids:
-            max_w = db.session.query(func.max(WorkoutSet.weight_lbs))                 .join(Workout)                 .filter(
+            def _best_1rm(sets):
+                best = 0.0
+                for ws in sets:
+                    r = ws.reps or 1
+                    est = float(ws.weight_lbs) * (1 + r / 30.0)
+                    if est > best:
+                        best = est
+                return best
+
+            prev_sets = db.session.query(WorkoutSet.weight_lbs, WorkoutSet.reps)\
+                .join(Workout)\
+                .filter(
                     WorkoutSet.exercise_id == ex_id,
                     WorkoutSet.skipped == False,
                     WorkoutSet.weight_lbs.isnot(None),
-                    Workout.completed_at <= workout.completed_at,
-                ).scalar()
-            if max_w:
-                pr_map[ex_id] = float(max_w)
+                    Workout.completed_at < workout.completed_at,
+                ).all()
+            pr_map[ex_id] = _best_1rm(prev_sets)
+
+            curr_sets = db.session.query(WorkoutSet.weight_lbs, WorkoutSet.reps)\
+                .filter(
+                    WorkoutSet.workout_id == workout.id,
+                    WorkoutSet.exercise_id == ex_id,
+                    WorkoutSet.skipped == False,
+                    WorkoutSet.weight_lbs.isnot(None),
+                ).all()
+            pr_best[ex_id] = _best_1rm(curr_sets)
 
     # Check for linked premade result (benchmark workout)
     premade_result = None
@@ -67,7 +88,7 @@ def view(workout_id):
         pass
 
     return render_template('workouts/view.html', workout=workout, pr_map=pr_map,
-                           premade_result=premade_result)
+                           pr_best=pr_best, premade_result=premade_result)
 
 
 # ── Delete ─────────────────────────────────────────────────

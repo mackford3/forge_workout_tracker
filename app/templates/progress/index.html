@@ -328,13 +328,24 @@ function renderStrengthChart() {
   strengthChart = buildLineChart('strength-chart', labels, values, pointColors, lineColor, unit, tickFmt);
 
   // Session list
+  // Pre-compute which sessions set a new PR (first time a new max was reached).
+  // data is sorted ascending by date from the backend.
+  const prDates = new Set();
+  let runningMax = -Infinity;
+  data.forEach(d => {
+    const val = unit === 'lbs'
+      ? (strengthMetric==='weight' ? d.max_lbs : strengthMetric==='volume' ? d.volume_lbs : d.est_1rm_lbs)
+      : (strengthMetric==='weight' ? d.max_kg  : strengthMetric==='volume' ? d.volume_kg  : d.est_1rm_kg);
+    if (val > runningMax) { runningMax = val; prDates.add(d.date); }
+  });
+
   const list = document.getElementById('strength-session-list');
   list.innerHTML = '';
   [...data].reverse().forEach(d => {
     const dispVal  = unit === 'lbs'
       ? (strengthMetric==='weight' ? d.max_lbs : strengthMetric==='volume' ? d.volume_lbs : d.est_1rm_lbs)
       : (strengthMetric==='weight' ? d.max_kg  : strengthMetric==='volume' ? d.volume_kg  : d.est_1rm_kg);
-    const isBest   = dispVal === bestVal;
+    const isBest   = prDates.has(d.date);
     const setsHtml = d.sets.map(s =>
       `<span style="font-family:'DM Mono',monospace;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 8px;">${s.lbs}${unit} × ${s.reps||'?'}</span>`
     ).join(' ');
