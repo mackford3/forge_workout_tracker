@@ -192,6 +192,51 @@ def htmx_set_row():
     return render_template('partials/set_row.html', index=index, exercises=exercises)
 
 
+# ── Log Cardio (selection hub) ──────────────────────────────
+@workouts_bp.route('/log/cardio')
+def log_cardio():
+    return render_template('workouts/log_cardio_select.html')
+
+
+# ── Log Cardio Machine (standalone: row, skierg, stairclimber, other) ──
+@workouts_bp.route('/log/cardio/machine', methods=['GET', 'POST'])
+def log_cardio_machine():
+    if request.method == 'GET':
+        machine = request.args.get('machine', 'row')
+        return render_template('workouts/log_cardio_machine.html',
+                               machine=machine, locations=LOCATION_CHOICES)
+
+    f = request.form
+    workout = Workout(
+        workout_type='cardio',
+        name=f.get('name') or 'Cardio Session',
+        location=f.get('location', 'gym'),
+        duration_minutes=int(f['duration_minutes']) if f.get('duration_minutes') else None,
+        notes=f.get('notes'),
+        completed_at=datetime.fromisoformat(f['completed_at']) if f.get('completed_at') else datetime.utcnow()
+    )
+    db.session.add(workout)
+    db.session.flush()
+
+    cardio_indices = sorted(set(
+        int(k.split('[')[1].split(']')[0])
+        for k in f.keys() if k.startswith('cardio[') and '[machine]' in k
+    ))
+    for j in cardio_indices:
+        db.session.add(CardioSet(
+            workout_id = workout.id,
+            machine    = f[f'cardio[{j}][machine]'],
+            set_number = j + 1,
+            distance_m = int(float(f[f'cardio[{j}][distance_m]'])) if f.get(f'cardio[{j}][distance_m]') else None,
+            duration_s = _time_to_seconds(f.get(f'cardio[{j}][duration]')),
+            calories   = int(f[f'cardio[{j}][calories]'])  if f.get(f'cardio[{j}][calories]')  else None,
+            damper     = int(f[f'cardio[{j}][damper]'])    if f.get(f'cardio[{j}][damper]')    else None,
+            rpe        = float(f[f'cardio[{j}][rpe]'])     if f.get(f'cardio[{j}][rpe]')       else None,
+        ))
+    db.session.commit()
+    return redirect(url_for('workouts.view', workout_id=workout.id))
+
+
 # ── Log Run ────────────────────────────────────────────────
 @workouts_bp.route('/log/run', methods=['GET', 'POST'])
 def log_run():
@@ -266,6 +311,39 @@ def log_run():
 def htmx_interval_row():
     index = request.args.get('index', 0, type=int)
     return render_template('partials/interval_row.html', index=index)
+
+
+# ── Log Mobility ────────────────────────────────────────────
+@workouts_bp.route('/log/mobility', methods=['GET', 'POST'])
+def log_mobility():
+    if request.method == 'POST':
+        f = request.form
+        notes_parts = []
+        if f.get('mobility_type'):
+            type_labels = {
+                'yoga': 'Yoga', 'mobility_flow': 'Mobility Flow',
+                'foam_rolling': 'Foam Rolling', 'stretching': 'Stretching',
+                'mixed': 'Mixed', 'other': 'Other',
+            }
+            notes_parts.append('Type: ' + type_labels.get(f['mobility_type'], f['mobility_type']))
+        if f.get('focus_areas'):
+            notes_parts.append('Focus: ' + f['focus_areas'])
+        if f.get('notes'):
+            notes_parts.append(f['notes'])
+        combined_notes = '\n'.join(notes_parts) or None
+
+        workout = Workout(
+            workout_type='mobility',
+            name=f.get('name') or 'Mobility Session',
+            location=f.get('location', 'home'),
+            duration_minutes=int(f['duration_minutes']) if f.get('duration_minutes') else None,
+            notes=combined_notes,
+            completed_at=datetime.fromisoformat(f['completed_at']) if f.get('completed_at') else datetime.utcnow()
+        )
+        db.session.add(workout)
+        db.session.commit()
+        return redirect(url_for('workouts.view', workout_id=workout.id))
+    return render_template('workouts/log_mobility.html', locations=LOCATION_CHOICES)
 
 
 # ── Hyrox Start (selection page) ───────────────────────────

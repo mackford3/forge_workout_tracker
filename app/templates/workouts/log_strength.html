@@ -151,11 +151,11 @@
     loadHistory(id, exIdx);
   }
 
-  // ── Exercise reorder ────────────────────────────────────
+  // ── Exercise / cardio reorder ────────────────────────────
   function moveBlock(btn, dir) {
-    const block = btn.closest('.exercise-block');
+    const block = btn.closest('.exercise-block, .cardio-block');
     const container = document.getElementById('exercises-container');
-    const blocks = [...container.querySelectorAll(':scope > .exercise-block')];
+    const blocks = [...container.children];
     const idx = blocks.indexOf(block);
     if (dir === -1 && idx > 0) container.insertBefore(block, blocks[idx - 1]);
     else if (dir === 1 && idx < blocks.length - 1) container.insertBefore(blocks[idx + 1], block);
@@ -297,8 +297,14 @@
     block.className = 'card cardio-block';
     block.style.cssText = 'margin-bottom:10px;position:relative;border-color:color-mix(in srgb,var(--run) 35%,transparent);';
     block.innerHTML = `
-      <button type="button" onclick="this.closest('.card').remove()"
-        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+      <div style="display:flex;align-items:center;gap:6px;position:absolute;top:10px;right:10px;z-index:1;">
+        <button type="button" onclick="moveBlock(this,-1)"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;" title="Move up">↑</button>
+        <button type="button" onclick="moveBlock(this,1)"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;" title="Move down">↓</button>
+        <button type="button" onclick="this.closest('.cardio-block').remove()"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+      </div>
       <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--run);margin-bottom:12px;">
         🚣 CARDIO SET
       </div>
@@ -306,7 +312,7 @@
         <div>
           <label class="form-label">Machine</label>
           <select class="form-control" name="cardio[${idx}][machine]">
-            <option value="row">Row</option>
+            <option value="row">Row Machine (ERG)</option>
             <option value="skierg">SkiErg</option>
             <option value="bike">Assault Bike</option>
             <option value="treadmill">Treadmill</option>

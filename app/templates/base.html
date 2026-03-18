@@ -357,10 +357,15 @@
           <div class="lc-label" style="color:var(--strength)">Strength</div>
           <div class="lc-sub">Sets · Reps · Weight</div>
         </a>
-        <a href="{{ url_for('workouts.log_run') }}" class="log-card" style="border-color:color-mix(in srgb, var(--run) 30%, transparent)">
+        <a href="{{ url_for('workouts.log_cardio') }}" class="log-card" style="border-color:color-mix(in srgb, var(--run) 30%, transparent)">
           <div class="lc-icon">🏃</div>
-          <div class="lc-label" style="color:var(--run)">Run</div>
-          <div class="lc-sub">Distance · Time · Intervals</div>
+          <div class="lc-label" style="color:var(--run)">Cardio</div>
+          <div class="lc-sub">Run · Row · SkiErg · Bike</div>
+        </a>
+        <a href="{{ url_for('workouts.log_mobility') }}" class="log-card" style="border-color:color-mix(in srgb, var(--strength) 30%, transparent)">
+          <div class="lc-icon">🧘</div>
+          <div class="lc-label" style="color:var(--strength)">Mobility</div>
+          <div class="lc-sub">Yoga · Stretch · Recovery</div>
         </a>
         <a href="{{ url_for('workouts.log_hyrox') }}" class="log-card" style="border-color:color-mix(in srgb, var(--hyrox) 30%, transparent)">
           <div class="lc-icon">🔥</div>
