@@ -296,15 +296,100 @@
         <div class="stat-val" style="font-size:22px;">{{ h.race_type|title }}</div>
         <div class="stat-label">Race Type</div>
       </div>
+      {% if h.running_time_s %}
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:18px;">
+          {{ h.running_time_s//60 }}:{{ "%02d"|format(h.running_time_s%60) }}
+        </div>
+        <div class="stat-label">Running</div>
+      </div>
+      {% endif %}
+      {% if h.workout_time_s %}
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:18px;color:var(--hyrox);">
+          {{ h.workout_time_s//60 }}:{{ "%02d"|format(h.workout_time_s%60) }}
+        </div>
+        <div class="stat-label">Stations</div>
+      </div>
+      {% endif %}
     </div>
     {% if h.location %}<p style="font-size:13px;color:var(--muted);margin-bottom:12px;">📍 {{ h.location }}</p>{% endif %}
+
     {% for station in h.stations.order_by('station_order').all() %}
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
-      <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);min-width:18px;">{{ station.station_order }}</span>
-      <span style="flex:1;font-size:13px;font-weight:500;">{{ station.station_name }}</span>
-      <span style="font-family:'DM Mono',monospace;font-size:13px;color:var(--hyrox);">
-        {% if station.time_s %}{{ station.time_s//60 }}:{{ "%02d"|format(station.time_s%60) }}{% else %}—{% endif %}
-      </span>
+    {% set is_run_station = 'Run' in station.station_name %}
+    {% set is_row_station = station.station_name == 'Row' %}
+    <div style="padding:8px 0;border-bottom:1px solid var(--border);">
+
+      <!-- Station header -->
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);min-width:18px;">{{ station.station_order }}</span>
+
+        <span style="flex:1;font-size:13px;font-weight:500;{% if is_run_station %}opacity:0.75;{% endif %}">
+          {{ station.station_name }}
+          {% if station.is_substituted %}
+          <span style="font-size:10px;background:rgba(168,85,247,0.15);color:#a855f7;
+                       border:1px solid rgba(168,85,247,0.3);padding:1px 5px;border-radius:4px;
+                       margin-left:4px;font-weight:600;white-space:nowrap;">
+            SUB{% if station.sub_exercise_name %}: {{ station.sub_exercise_name }}{% endif %}
+          </span>
+          {% endif %}
+          {% if station.had_break %}
+          <span style="font-size:10px;color:var(--muted);margin-left:4px;opacity:0.7;">(broken)</span>
+          {% endif %}
+        </span>
+
+        <!-- Metrics chips -->
+        {% if station.time_s %}
+        <span style="font-family:'DM Mono',monospace;font-size:13px;color:{% if is_run_station %}var(--muted){% else %}var(--hyrox){% endif %};">
+          {{ station.time_s//60 }}:{{ "%02d"|format(station.time_s%60) }}
+        </span>
+        {% endif %}
+        {% if station.distance_m %}
+        <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);">
+          {{ station.distance_m }}m{% if is_run_station %} / {{ "%.2f"|format(station.distance_m / 1609.344) }}mi{% endif %}
+        </span>
+        {% endif %}
+        {% if station.reps %}
+        <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);">{{ station.reps }} reps</span>
+        {% endif %}
+        {% if station.weight_lbs or station.weight_kg %}
+        <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);">
+          {% if weight_unit == 'lbs' %}{{ station.weight_lbs|float|int }} lbs
+          {% else %}{{ "%.1f"|format(station.weight_kg|float) }} kg{% endif %}
+        </span>
+        {% endif %}
+        {% if station.damper %}
+        <span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);">D{{ station.damper }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Rest after -->
+      {% if station.rest_after_s %}
+      <div style="margin-top:3px;margin-left:26px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);opacity:0.6;">
+        rest {{ station.rest_after_s//60 }}:{{ "%02d"|format(station.rest_after_s%60) }}
+      </div>
+      {% endif %}
+
+      <!-- Segment breakdown -->
+      {% if station.had_break %}
+      {% set segs = station.segments.order_by('segment_order').all() %}
+      {% if segs %}
+      <div style="margin-top:6px;margin-left:26px;display:flex;flex-direction:column;gap:2px;">
+        {% for seg in segs %}
+        <div style="display:flex;gap:10px;align-items:center;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">
+          <span style="min-width:14px;opacity:0.5;">{{ seg.segment_order }}</span>
+          {% if seg.time_s %}<span>{{ seg.time_s//60 }}:{{ "%02d"|format(seg.time_s%60) }}</span>{% endif %}
+          {% if seg.distance_m %}<span>{{ seg.distance_m }}m</span>{% endif %}
+          {% if seg.reps %}<span>{{ seg.reps }} reps</span>{% endif %}
+          {% if seg.weight_lbs or seg.weight_kg %}
+          <span>{% if weight_unit == 'lbs' %}{{ seg.weight_lbs|float|int }} lbs{% else %}{{ "%.1f"|format(seg.weight_kg|float) }} kg{% endif %}</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endif %}
+
     </div>
     {% endfor %}
   </div>

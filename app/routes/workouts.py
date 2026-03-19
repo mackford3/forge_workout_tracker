@@ -3,8 +3,8 @@ from flask import Blueprint, render_template, request, redirect, url_for, Respon
 import csv, io
 from datetime import datetime
 from ..models import (db, Workout, WorkoutSet, Exercise, Run, RunSegment,
-                      CardioSet, HyroxResult, HyroxStation, HYROX_DEFAULT_STATIONS,
-                      HYROX_TRAINING_PRESETS,
+                      CardioSet, HyroxResult, HyroxStation, HyroxStationSegment,
+                      HYROX_DEFAULT_STATIONS, HYROX_TRAINING_PRESETS,
                       Circuit, CircuitExercise, CircuitRoundSet)
 from ..utils import lbs_to_kg
 
@@ -382,7 +382,7 @@ def log_hyrox_race():
         workout = Workout(
             workout_type='hyrox',
             name=f.get('name', 'Hyrox'),
-            location=f.get('location', 'gym'),
+            location='gym',
             duration_minutes=int(f['duration_minutes']) if f.get('duration_minutes') else None,
             calories=int(f['calories']) if f.get('calories') else None,
             avg_bpm=int(f['avg_bpm']) if f.get('avg_bpm') else None,
@@ -426,7 +426,7 @@ def log_hyrox_training():
         workout = Workout(
             workout_type='hyrox',
             name=f.get('name', preset['default_name']),
-            location=f.get('location', 'gym'),
+            location='gym',
             duration_minutes=int(f['duration_minutes']) if f.get('duration_minutes') else None,
             calories=int(f['calories']) if f.get('calories') else None,
             avg_bpm=int(f['avg_bpm']) if f.get('avg_bpm') else None,
@@ -628,25 +628,73 @@ def _save_hyrox_stations(result_id, f):
         if f.get(f'stations[{i}][skipped]'):
             i += 1
             continue
+
         weight_raw = float(f[f'stations[{i}][weight]']) if f.get(f'stations[{i}][weight]') else None
         unit = f.get(f'stations[{i}][unit]', 'lbs')
         weight_kg = weight_lbs = None
         if weight_raw:
             if unit == 'lbs':
-                weight_lbs = weight_raw; weight_kg = lbs_to_kg(weight_raw)
+                weight_lbs = weight_raw
+                weight_kg  = lbs_to_kg(weight_raw)
             else:
-                weight_kg = weight_raw; weight_lbs = weight_raw * 2.20462
-        db.session.add(HyroxStation(
-            hyrox_result_id = result_id,
-            station_order   = i + 1,
-            station_name    = f[f'stations[{i}][name]'],
-            time_s          = _time_to_seconds(f.get(f'stations[{i}][time]')),
-            weight_kg       = weight_kg,
-            weight_lbs      = weight_lbs,
-            distance_m      = int(f[f'stations[{i}][distance_m]']) if f.get(f'stations[{i}][distance_m]') else None,
-            reps            = int(f[f'stations[{i}][reps]']) if f.get(f'stations[{i}][reps]') else None,
-            notes           = f.get(f'stations[{i}][notes]'),
-        ))
+                weight_kg  = weight_raw
+                weight_lbs = weight_raw * 2.20462
+
+        had_break        = bool(f.get(f'stations[{i}][had_break]'))
+        is_substituted   = bool(f.get(f'stations[{i}][is_substituted]'))
+        sub_name         = f.get(f'stations[{i}][sub_exercise_name]') or None
+
+        station = HyroxStation(
+            hyrox_result_id   = result_id,
+            station_order     = i + 1,
+            station_name      = f[f'stations[{i}][name]'],
+            time_s            = _time_to_seconds(f.get(f'stations[{i}][time]')),
+            weight_kg         = weight_kg,
+            weight_lbs        = weight_lbs,
+            distance_m        = int(f[f'stations[{i}][distance_m]']) if f.get(f'stations[{i}][distance_m]') else None,
+            reps              = int(f[f'stations[{i}][reps]'])       if f.get(f'stations[{i}][reps]')       else None,
+            damper            = int(f[f'stations[{i}][damper]'])     if f.get(f'stations[{i}][damper]')     else None,
+            rest_after_s      = _time_to_seconds(f.get(f'stations[{i}][rest_after]')),
+            notes             = f.get(f'stations[{i}][notes]'),
+            had_break         = had_break,
+            is_substituted    = is_substituted,
+            sub_exercise_name = sub_name,
+        )
+        db.session.add(station)
+        db.session.flush()  # populate station.id before inserting segments
+
+        if had_break:
+            # Collect all segment indices that have any data (handles gaps from deleted segments)
+            seg_indices = sorted(set(
+                int(k.split(f'stations[{i}][segments][')[1].split(']')[0])
+                for k in f.keys()
+                if f'stations[{i}][segments][' in k
+            ))
+            for j in seg_indices:
+                seg_w_raw = float(f[f'stations[{i}][segments][{j}][weight]']) \
+                    if f.get(f'stations[{i}][segments][{j}][weight]') else None
+                seg_unit = f.get(f'stations[{i}][segments][{j}][unit]', unit)
+                seg_wkg = seg_wlbs = None
+                if seg_w_raw:
+                    if seg_unit == 'lbs':
+                        seg_wlbs = seg_w_raw
+                        seg_wkg  = lbs_to_kg(seg_w_raw)
+                    else:
+                        seg_wkg  = seg_w_raw
+                        seg_wlbs = seg_w_raw * 2.20462
+
+                db.session.add(HyroxStationSegment(
+                    hyrox_station_id = station.id,
+                    segment_order    = j + 1,
+                    distance_m       = int(f[f'stations[{i}][segments][{j}][distance_m]'])
+                                       if f.get(f'stations[{i}][segments][{j}][distance_m]') else None,
+                    reps             = int(f[f'stations[{i}][segments][{j}][reps]'])
+                                       if f.get(f'stations[{i}][segments][{j}][reps]') else None,
+                    weight_kg        = seg_wkg,
+                    weight_lbs       = seg_wlbs,
+                    time_s           = _time_to_seconds(f.get(f'stations[{i}][segments][{j}][time]')),
+                    notes            = f.get(f'stations[{i}][segments][{j}][notes]'),
+                ))
         i += 1
 
 
