@@ -191,16 +191,37 @@ HYROX_TRAINING_PRESETS = {
 
 class HyroxStation(db.Model):
     __tablename__ = 'hyrox_stations'
-    id              = db.Column(db.Integer, primary_key=True)
-    hyrox_result_id = db.Column(db.Integer, db.ForeignKey('hyrox_results.id'), nullable=False)
-    station_order   = db.Column(db.Integer, nullable=False)
-    station_name    = db.Column(db.String(100), nullable=False)
-    time_s          = db.Column(db.Integer)
-    weight_kg       = db.Column(db.Numeric(6, 2))
-    weight_lbs      = db.Column(db.Numeric(6, 2))
-    distance_m      = db.Column(db.Integer)
-    reps            = db.Column(db.Integer)
-    notes           = db.Column(db.Text)
+    id                = db.Column(db.Integer, primary_key=True)
+    hyrox_result_id   = db.Column(db.Integer, db.ForeignKey('hyrox_results.id'), nullable=False)
+    station_order     = db.Column(db.Integer, nullable=False)
+    station_name      = db.Column(db.String(100), nullable=False)
+    time_s            = db.Column(db.Integer)
+    weight_kg         = db.Column(db.Numeric(6, 2))
+    weight_lbs        = db.Column(db.Numeric(6, 2))
+    distance_m        = db.Column(db.Integer)
+    reps              = db.Column(db.Integer)
+    damper            = db.Column(db.Integer)
+    rest_after_s      = db.Column(db.Integer)
+    notes             = db.Column(db.Text)
+    is_substituted    = db.Column(db.Boolean, default=False)
+    sub_exercise_name = db.Column(db.String(100))
+    had_break         = db.Column(db.Boolean, default=False)
+    segments          = db.relationship('HyroxStationSegment', backref='station',
+                                        lazy='dynamic',
+                                        cascade='all, delete-orphan')
+
+
+class HyroxStationSegment(db.Model):
+    __tablename__ = 'hyrox_station_segments'
+    id               = db.Column(db.Integer, primary_key=True)
+    hyrox_station_id = db.Column(db.Integer, db.ForeignKey('hyrox_stations.id'), nullable=False)
+    segment_order    = db.Column(db.Integer, nullable=False)
+    distance_m       = db.Column(db.Integer)
+    reps             = db.Column(db.Integer)
+    weight_kg        = db.Column(db.Numeric(6, 2))
+    weight_lbs       = db.Column(db.Numeric(6, 2))
+    time_s           = db.Column(db.Integer)
+    notes            = db.Column(db.Text)
 
 
 class Circuit(db.Model):
