@@ -90,7 +90,7 @@
     <button type="button" onclick="this.closest('.exercise-block').remove()"
       style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
 
-    <div class="form-group" style="margin-bottom:12px;padding-right:28px;">
+    <div class="form-group" style="margin-bottom:6px;padding-right:28px;">
       <label class="form-label">Exercise</label>
       <select class="form-control exercise-select" onchange="syncExercise(this)" required>
         {% for ex in exercises %}
@@ -98,14 +98,20 @@
         {% endfor %}
       </select>
     </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px;">
+      <input type="text" class="form-control" placeholder="Not listed? Type name &amp; add..."
+        style="font-size:12px;padding:6px 8px;" id="add-ex-input-{{ loop.index0 }}"/>
+      <button type="button" class="btn btn-secondary btn-sm"
+        onclick="createAndAddExercise({{ loop.index0 }})">Add</button>
+    </div>
 
     <div class="sets-row" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;align-items:flex-end;">
     {% for s in ex_sets %}
     {% set idx = global_idx.v %}
     <div class="set-card" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;min-width:110px;flex-shrink:0;position:relative;">
-      <button type="button" onclick="this.closest('.set-card').remove()"
+      <button type="button" onclick="var r=this.closest('.sets-row'); this.closest('.set-card').remove(); renumberSets(r);"
         style="position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;">✕</button>
-      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">Set {{ s.set_number }}</div>
+      <div class="set-label" style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">Set {{ s.set_number }}</div>
       <input type="hidden" name="sets[{{ idx }}][set_number]" value="{{ s.set_number }}"/>
       <input type="hidden" class="set-exercise-ref" name="sets[{{ idx }}][exercise_id]" value="{{ s.exercise_id }}"/>
       <div style="margin-bottom:6px;">
@@ -170,9 +176,15 @@
         </select>
       </div>
       <div>
-        <label class="form-label">Distance (m)</label>
-        <input class="form-control" type="number" name="cardio[{{ loop.index0 }}][distance_m]"
-          value="{{ cs.distance_m or '' }}" style="font-family:'DM Mono',monospace;"/>
+        <label class="form-label">Distance (<span id="edit-dist-label-{{ loop.index0 }}">m</span>)</label>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input class="form-control" type="number" name="cardio[{{ loop.index0 }}][distance_m]"
+            value="{{ cs.distance_m or '' }}" style="font-family:'DM Mono',monospace;"/>
+          <input type="hidden" name="cardio[{{ loop.index0 }}][distance_unit]"
+            id="edit-dist-unit-{{ loop.index0 }}" value="m"/>
+          <button type="button" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 8px;"
+            onclick="toggleEditDist({{ loop.index0 }})">m|mi</button>
+        </div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
@@ -381,6 +393,23 @@
   let globalCardioIndex = parseInt(document.getElementById('global-cardio-index')?.value || 0);
   let exerciseCount     = document.querySelectorAll('.exercise-block').length;
 
+  function toggleEditDist(idx) {
+    const unit = document.getElementById(`edit-dist-unit-${idx}`);
+    const label = document.getElementById(`edit-dist-label-${idx}`);
+    unit.value = unit.value === 'm' ? 'mi' : 'm';
+    label.textContent = unit.value;
+  }
+
+  function renumberSets(row) {
+    row.querySelectorAll('.set-card').forEach((card, i) => {
+      const num = i + 1;
+      const label = card.querySelector('.set-label');
+      if (label) label.textContent = 'Set ' + num;
+      const hidden = card.querySelector('input[name*="[set_number]"]');
+      if (hidden) hidden.value = num;
+    });
+  }
+
   function addCardioSetEdit() {
     const idx = globalCardioIndex++;
     const block = document.createElement('div');
@@ -400,8 +429,13 @@
           </select>
         </div>
         <div>
-          <label class="form-label">Distance (m)</label>
-          <input class="form-control" type="number" name="cardio[${idx}][distance_m]" style="font-family:'DM Mono',monospace;"/>
+          <label class="form-label">Distance (<span id="edit-dist-label-${idx}">m</span>)</label>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <input class="form-control" type="number" name="cardio[${idx}][distance_m]" style="font-family:'DM Mono',monospace;"/>
+            <input type="hidden" name="cardio[${idx}][distance_unit]" id="edit-dist-unit-${idx}" value="m"/>
+            <button type="button" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 8px;"
+              onclick="toggleEditDist(${idx})">m|mi</button>
+          </div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
@@ -440,9 +474,9 @@
     card.className = 'set-card';
     card.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;min-width:110px;flex-shrink:0;position:relative;';
     card.innerHTML = `
-      <button type="button" onclick="this.closest('.set-card').remove()"
+      <button type="button" onclick="var r=this.closest('.sets-row'); this.closest('.set-card').remove(); renumberSets(r);"
         style="position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;">✕</button>
-      <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">Set ${setNum}</div>
+      <div class="set-label" style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">Set ${setNum}</div>
       <input type="hidden" name="sets[${idx}][set_number]" value="${setNum}"/>
       <input type="hidden" class="set-exercise-ref" name="sets[${idx}][exercise_id]" value="${exId}"/>
       <div style="margin-bottom:6px;">
@@ -479,17 +513,47 @@
     block.innerHTML = `
       <button type="button" onclick="this.closest('.exercise-block').remove()"
         style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
-      <div class="form-group" style="margin-bottom:12px;padding-right:28px;">
+      <div class="form-group" style="margin-bottom:6px;padding-right:28px;">
         <label class="form-label">Exercise</label>
         <select class="form-control exercise-select" onchange="syncExercise(this)" required>
           ${buildExerciseOptions('')}
         </select>
       </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <input type="text" class="form-control" placeholder="Not listed? Type name &amp; add..."
+          style="font-size:12px;padding:6px 8px;" id="add-ex-input-${exIdx}"/>
+        <button type="button" class="btn btn-secondary btn-sm"
+          onclick="createAndAddExercise(${exIdx})">Add</button>
+      </div>
       <div class="sets-row" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;align-items:flex-end;"></div>
       <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;font-size:13px;"
         onclick="addSet(this, ${exIdx})">+ Add Set</button>`;
     document.getElementById('exercises-container').appendChild(block);
-    addSet(block.querySelector('.btn'), exIdx);
+    addSet(block.querySelector('[onclick*="addSet"]'), exIdx);
+  }
+
+  async function createAndAddExercise(exIdx) {
+    const input = document.getElementById(`add-ex-input-${exIdx}`);
+    const name = (input?.value || '').trim();
+    if (!name) return;
+    try {
+      const res = await fetch('/exercises/find-or-create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) { alert('Could not save exercise.'); return; }
+      const data = await res.json();
+      if (!exercises.find(e => e.id == data.id)) {
+        exercises.push({ id: data.id, name: data.name, group: data.muscle_group });
+      }
+      const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
+      const sel = block.querySelector('.exercise-select');
+      sel.innerHTML = buildExerciseOptions(data.id);
+      sel.value = data.id;
+      syncExercise(sel);
+      if (input) input.value = '';
+    } catch(e) { alert('Error creating exercise.'); }
   }
 </script>
 {% endif %}

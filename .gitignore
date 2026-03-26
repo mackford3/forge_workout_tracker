@@ -2,6 +2,8 @@
 __pycache__/
 *.py[codz]
 *$py.class
+unraid/*
+unraid_setup/*
 
 
 #folders 
@@ -9,6 +11,7 @@ config/
 app/config/
 app/static/img/
 app/static/video/
+.env.docker
 
 #files
 requirements.txt

@@ -22,6 +22,7 @@
         <option value="continuous">Continuous (e.g. 7 miles straight)</option>
         <option value="interval">Interval (e.g. 0.25mi × 8)</option>
         <option value="timed">Timed (run for X minutes)</option>
+        <option value="recovery">Recovery (easy distance/time)</option>
       </select>
     </div>
     <div class="form-group">
@@ -34,8 +35,13 @@
   <div class="card" id="overall-fields">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div class="form-group" id="distance-field">
-        <label class="form-label">Distance (km)</label>
-        <input class="form-control" type="number" step="0.001" min="0" name="total_distance_km" placeholder="0.000"/>
+        <label class="form-label">Distance (<span id="run-dist-label">km</span>)</label>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input class="form-control" type="number" step="0.001" min="0" name="total_distance_km" placeholder="0.000"/>
+          <input type="hidden" name="distance_unit" id="run-dist-unit" value="km"/>
+          <button type="button" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 8px;"
+            onclick="toggleRunDist()">km|mi</button>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">Total Time (MM:SS)</label>
@@ -95,6 +101,7 @@
       intervalSection.style.display = 'none';
       distField.style.opacity = '1';
     }
+    // recovery shows same fields as continuous
   }
 
   function incInterval() {
@@ -102,6 +109,13 @@
     const btn = document.getElementById('add-interval-btn');
     btn.setAttribute('hx-get', `{{ url_for('workouts.htmx_interval_row') }}?index=${iIdx}`);
     htmx.process(btn);
+  }
+
+  function toggleRunDist() {
+    const unit = document.getElementById('run-dist-unit');
+    const label = document.getElementById('run-dist-label');
+    unit.value = unit.value === 'km' ? 'mi' : 'km';
+    label.textContent = unit.value;
   }
 
   function removeRow(btn) { btn.closest('.set-row').remove(); }

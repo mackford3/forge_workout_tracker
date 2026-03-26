@@ -248,7 +248,8 @@ def log_cardio_machine():
             workout_id = workout.id,
             machine    = f[f'cardio[{j}][machine]'],
             set_number = j + 1,
-            distance_m = int(float(f[f'cardio[{j}][distance_m]'])) if f.get(f'cardio[{j}][distance_m]') else None,
+            distance_m = (lambda raw, unit: int(round(float(raw) * (1609.344 if unit == 'mi' else 1))) if raw else None)(
+                f.get(f'cardio[{j}][distance_m]'), f.get(f'cardio[{j}][distance_unit]', 'm')),
             duration_s = _time_to_seconds(f.get(f'cardio[{j}][duration]')),
             calories   = int(f[f'cardio[{j}][calories]'])  if f.get(f'cardio[{j}][calories]')  else None,
             damper     = int(f[f'cardio[{j}][damper]'])    if f.get(f'cardio[{j}][damper]')    else None,
@@ -276,10 +277,18 @@ def log_run():
         db.session.add(workout)
         db.session.flush()
 
+        dist_raw  = f.get('total_distance_km')
+        dist_unit = f.get('distance_unit', 'km')
+        total_dist_km = None
+        if dist_raw:
+            total_dist_km = float(dist_raw)
+            if dist_unit == 'mi':
+                total_dist_km = total_dist_km * 1.60934
+
         run = Run(
             workout_id        = workout.id,
             run_type          = f.get('run_type', 'continuous'),
-            total_distance_km = float(f['total_distance_km']) if f.get('total_distance_km') else None,
+            total_distance_km = total_dist_km,
             total_duration_s  = _time_to_seconds(f.get('total_duration')),
             avg_heart_rate    = int(f['avg_heart_rate']) if f.get('avg_heart_rate') else None,
             route_notes       = f.get('route_notes'),
@@ -326,6 +335,50 @@ def log_run():
         return redirect(url_for('workouts.view', workout_id=workout.id))
 
     return render_template('workouts/log_run.html', locations=LOCATION_CHOICES)
+
+
+# ── Log Bike ────────────────────────────────────────────────
+@workouts_bp.route('/log/bike', methods=['GET', 'POST'])
+def log_bike():
+    if request.method == 'POST':
+        f = request.form
+        dist_raw  = f.get('total_distance_km')
+        dist_unit = f.get('distance_unit', 'km')
+        total_distance_km = None
+        if dist_raw:
+            total_distance_km = float(dist_raw)
+            if dist_unit == 'mi':
+                total_distance_km = total_distance_km * 1.60934
+
+        workout = Workout(
+            workout_type='bike',
+            name=f.get('name') or 'Bike Ride',
+            location=f.get('location', 'gym'),
+            duration_minutes=int(f['duration_minutes']) if f.get('duration_minutes') else None,
+            calories=int(f['calories']) if f.get('calories') else None,
+            avg_bpm=int(f['avg_heart_rate']) if f.get('avg_heart_rate') else None,
+            notes=f.get('notes'),
+            completed_at=datetime.fromisoformat(f['completed_at']) if f.get('completed_at') else datetime.utcnow()
+        )
+        db.session.add(workout)
+        db.session.flush()
+
+        run = Run(
+            workout_id        = workout.id,
+            run_type          = f.get('run_type', 'continuous'),
+            total_distance_km = total_distance_km,
+            total_duration_s  = _time_to_seconds(f.get('total_duration')),
+            avg_heart_rate    = int(f['avg_heart_rate']) if f.get('avg_heart_rate') else None,
+            route_notes       = f.get('route_notes'),
+        )
+        db.session.add(run)
+        db.session.commit()
+        return redirect(url_for('workouts.view', workout_id=workout.id))
+
+    environment = request.args.get('environment', 'indoor')
+    return render_template('workouts/log_bike.html',
+                           environment=environment,
+                           locations=LOCATION_CHOICES)
 
 
 @workouts_bp.route('/htmx/interval-row')
@@ -776,7 +829,9 @@ def edit(workout_id):
                 machine = f[f'cardio[{j}][machine]']
                 dist_m = None
                 if f.get(f'cardio[{j}][distance_m]'):
-                    dist_m = int(float(f[f'cardio[{j}][distance_m]']))
+                    raw = float(f[f'cardio[{j}][distance_m]'])
+                    unit = f.get(f'cardio[{j}][distance_unit]', 'm')
+                    dist_m = int(round(raw * (1609.344 if unit == 'mi' else 1)))
                 elif f.get(f'cardio[{j}][distance_km]'):
                     dist_m = int(float(f[f'cardio[{j}][distance_km]']) * 1000)
                 db.session.add(CardioSet(

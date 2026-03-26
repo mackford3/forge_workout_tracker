@@ -10,6 +10,12 @@
   <a href="{{ url_for('exercises.new') }}" class="btn btn-primary btn-sm">+ Add</a>
 </div>
 
+<!-- Search bar -->
+<div style="margin-bottom:12px;">
+  <input type="text" id="ex-search" class="form-control" placeholder="Search exercises..."
+    oninput="filterExercises(this.value)" style="font-size:15px;"/>
+</div>
+
 <!-- Filter pills -->
 <div class="pill-tabs" style="margin-bottom:16px;">
   <a class="pill {{ 'active' if not muscle_filter and not category_filter }}" href="{{ url_for('exercises.index') }}">All</a>
@@ -23,12 +29,13 @@
 
 {% if grouped %}
   {% for category, exs in grouped.items() %}
-  <div style="margin-bottom:20px;">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+  <div class="ex-category-block" data-category="{{ category | lower }}" style="margin-bottom:20px;">
+    <div class="ex-category-header" style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">
       {{ category|upper }}
     </div>
     {% for ex in exs %}
-    <div class="card card-sm" style="margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
+    <div class="card card-sm ex-row" data-name="{{ ex.name | lower }}" data-muscle="{{ ex.muscle_group | lower if ex.muscle_group else '' }}"
+      style="margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
       <div>
         <span style="font-weight:500;font-size:14px;">{{ ex.name }}</span>
         {% if ex.muscle_group %}
@@ -51,4 +58,21 @@
     No exercises found{% if muscle_filter %} for {{ muscle_filter }}{% endif %}.
   </div>
 {% endif %}
+
+<script>
+  function filterExercises(query) {
+    const q = query.toLowerCase().trim();
+    document.querySelectorAll('.ex-category-block').forEach(block => {
+      let anyVisible = false;
+      block.querySelectorAll('.ex-row').forEach(row => {
+        const name   = row.dataset.name || '';
+        const muscle = row.dataset.muscle || '';
+        const show = !q || name.includes(q) || muscle.includes(q);
+        row.style.display = show ? '' : 'none';
+        if (show) anyVisible = true;
+      });
+      block.style.display = anyVisible ? '' : 'none';
+    });
+  }
+</script>
 {% endblock %}

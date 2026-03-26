@@ -236,6 +236,9 @@
   {% set display_dist = (run.total_distance_km | float) if run.total_distance_km is not none else seg_dist.km %}
 
   <div class="card" style="margin-bottom:10px;">
+    {% if run.run_type == 'recovery' %}
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#aaa;margin-bottom:10px;">🐢 RECOVERY RUN</div>
+    {% endif %}
     <div class="stat-grid" style="margin-bottom:12px;">
       <div class="stat-box">
         <div class="stat-val" style="font-size:26px;color:var(--run);">
@@ -278,6 +281,36 @@
       {% endfor %}
     </div>
     {% endif %}
+  </div>
+  {% endfor %}
+
+<!-- ── BIKE ── -->
+{% elif wtype == 'bike' %}
+  {% for run in workout.runs.all() %}
+  {% set display_dist = run.total_distance_km | float if run.total_distance_km is not none else 0 %}
+  <div class="card" style="margin-bottom:10px;border-color:color-mix(in srgb,var(--run) 30%,transparent);">
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--run);margin-bottom:10px;">
+      🚴 {{ run.run_type | upper if run.run_type else 'BIKE RIDE' }}
+    </div>
+    <div class="stat-grid" style="margin-bottom:12px;">
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:26px;color:var(--run);">
+          {% if display_dist > 0 %}{{ "%.2f"|format(display_dist) }} km{% else %}—{% endif %}
+        </div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" style="font-size:26px;color:var(--run);">
+          {% if run.total_duration_s %}
+            {% set h=run.total_duration_s//3600 %}{% set m=(run.total_duration_s%3600)//60 %}{% set s=run.total_duration_s%60 %}
+            {% if h %}{{ h }}:{{ "%02d"|format(m) }}:{{ "%02d"|format(s) }}{% else %}{{ m }}:{{ "%02d"|format(s) }}{% endif %}
+          {% else %}—{% endif %}
+        </div>
+        <div class="stat-label">Time</div>
+      </div>
+    </div>
+    {% if run.avg_heart_rate %}<p style="font-size:13px;color:var(--muted);margin-bottom:8px;">❤️ {{ run.avg_heart_rate }} bpm</p>{% endif %}
+    {% if run.route_notes %}<p style="font-size:13px;color:var(--muted);margin-bottom:8px;">📍 {{ run.route_notes }}</p>{% endif %}
   </div>
   {% endfor %}
 
@@ -465,6 +498,16 @@
     {% if c.notes %}<p style="font-size:12px;color:var(--muted);margin-top:4px;">{{ c.notes }}</p>{% endif %}
   </div>
   {% endfor %}
+<!-- ── MOBILITY ── -->
+{% elif wtype == 'mobility' %}
+<div class="card" style="margin-bottom:10px;border-color:color-mix(in srgb,var(--mobility) 30%,transparent);">
+  <div style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--mobility);margin-bottom:10px;">🧘 MOBILITY SESSION</div>
+  {% if workout.notes %}
+  <p style="font-size:14px;white-space:pre-wrap;margin:0;">{{ workout.notes }}</p>
+  {% else %}
+  <p style="font-size:13px;color:var(--muted);font-style:italic;margin:0;">No notes recorded.</p>
+  {% endif %}
+</div>
 {% endif %}
 
 <!-- Premade / Benchmark result -->

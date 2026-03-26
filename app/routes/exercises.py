@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify
+from sqlalchemy import func
 from ..models import db, Exercise
 
 exercises_bp = Blueprint('exercises', __name__)
@@ -59,3 +60,31 @@ def delete(ex_id):
     db.session.delete(ex)
     db.session.commit()
     return redirect(url_for('exercises.index'))
+
+
+@exercises_bp.route('/find-or-create', methods=['POST'])
+def find_or_create():
+    data = request.get_json(force=True)
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name required'}), 400
+
+    existing = Exercise.query.filter(func.lower(Exercise.name) == func.lower(name)).first()
+    if existing:
+        return jsonify({
+            'id': existing.id,
+            'name': existing.name,
+            'muscle_group': existing.muscle_group or '',
+            'created': False,
+        })
+
+    muscle_group = (data.get('muscle_group') or '').strip() or None
+    ex = Exercise(name=name, muscle_group=muscle_group, category='strength')
+    db.session.add(ex)
+    db.session.commit()
+    return jsonify({
+        'id': ex.id,
+        'name': ex.name,
+        'muscle_group': ex.muscle_group or '',
+        'created': True,
+    }), 201

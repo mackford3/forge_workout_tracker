@@ -87,6 +87,36 @@
     </div>
   </a>
 
+  <a href="{{ url_for('workouts.log_bike', environment='indoor') }}" style="display:block;text-decoration:none;">
+    <div class="card card-sm" style="border-color:color-mix(in srgb, var(--run) 25%, transparent);transition:border-color .15s,background .15s;"
+      onmouseenter="this.style.borderColor='var(--run)';this.style.background='color-mix(in srgb, var(--run) 6%, var(--surface))'"
+      onmouseleave="this.style.borderColor='';this.style.background=''">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:42px;height:42px;border-radius:10px;background:color-mix(in srgb, var(--run) 15%, transparent);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🚴</div>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:15px;color:var(--text);">Indoor Bike</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Stationary / Spin Bike</div>
+        </div>
+        <div style="color:var(--muted);font-size:18px;">›</div>
+      </div>
+    </div>
+  </a>
+
+  <a href="{{ url_for('workouts.log_bike', environment='outdoor') }}" style="display:block;text-decoration:none;">
+    <div class="card card-sm" style="border-color:color-mix(in srgb, var(--run) 25%, transparent);transition:border-color .15s,background .15s;"
+      onmouseenter="this.style.borderColor='var(--run)';this.style.background='color-mix(in srgb, var(--run) 6%, var(--surface))'"
+      onmouseleave="this.style.borderColor='';this.style.background=''">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:42px;height:42px;border-radius:10px;background:color-mix(in srgb, var(--run) 15%, transparent);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🚵</div>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:15px;color:var(--text);">Outdoor Bike</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Road / Mountain / Gravel</div>
+        </div>
+        <div style="color:var(--muted);font-size:18px;">›</div>
+      </div>
+    </div>
+  </a>
+
   <a href="{{ url_for('workouts.log_cardio_machine', machine='other') }}" style="display:block;text-decoration:none;">
     <div class="card card-sm" style="border-color:color-mix(in srgb, var(--run) 25%, transparent);transition:border-color .15s,background .15s;"
       onmouseenter="this.style.borderColor='var(--run)';this.style.background='color-mix(in srgb, var(--run) 6%, var(--surface))'"
@@ -95,7 +125,7 @@
         <div style="width:42px;height:42px;border-radius:10px;background:color-mix(in srgb, var(--run) 15%, transparent);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📍</div>
         <div style="flex:1;">
           <div style="font-weight:700;font-size:15px;color:var(--text);">Other</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Bike / Custom</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Custom machine</div>
         </div>
         <div style="color:var(--muted);font-size:18px;">›</div>
       </div>

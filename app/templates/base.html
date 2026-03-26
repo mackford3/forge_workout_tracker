@@ -137,6 +137,8 @@
     .badge-hyrox    { background: color-mix(in srgb, var(--hyrox) 15%, transparent); color: var(--hyrox); border: 1px solid color-mix(in srgb, var(--hyrox) 30%, transparent); }
     .badge-circuit  { background: color-mix(in srgb, var(--circuit) 15%, transparent); color: var(--circuit); border: 1px solid color-mix(in srgb, var(--circuit) 30%, transparent); }
     .badge-amrap    { background: color-mix(in srgb, var(--amrap) 15%, transparent); color: var(--amrap); border: 1px solid color-mix(in srgb, var(--amrap) 30%, transparent); }
+    .badge-mobility { background: color-mix(in srgb, var(--mobility) 15%, transparent); color: var(--mobility); border: 1px solid color-mix(in srgb, var(--mobility) 30%, transparent); }
+    .badge-bike     { background: color-mix(in srgb, var(--run) 15%, transparent); color: var(--run); border: 1px solid color-mix(in srgb, var(--run) 30%, transparent); }
     .badge-mixed { background: linear-gradient(135deg, color-mix(in srgb,var(--strength) 15%,transparent) 50%, color-mix(in srgb,var(--run) 15%,transparent) 50%); color: var(--text); border: 1px solid var(--border); }
 
     /* ── Buttons ── */
@@ -419,9 +421,9 @@
           <div class="lc-label" style="color:var(--run)">Cardio</div>
           <div class="lc-sub">Run · Row · SkiErg · Bike</div>
         </a>
-        <a href="{{ url_for('workouts.log_mobility') }}" class="log-card" style="border-color:color-mix(in srgb, var(--strength) 30%, transparent)">
+        <a href="{{ url_for('workouts.log_mobility') }}" class="log-card" style="border-color:color-mix(in srgb, var(--mobility) 30%, transparent)">
           <div class="lc-icon">🧘</div>
-          <div class="lc-label" style="color:var(--strength)">Mobility</div>
+          <div class="lc-label" style="color:var(--mobility)">Mobility</div>
           <div class="lc-sub">Yoga · Stretch · Recovery</div>
         </a>
         <a href="{{ url_for('workouts.log_hyrox') }}" class="log-card" style="border-color:color-mix(in srgb, var(--hyrox) 30%, transparent)">

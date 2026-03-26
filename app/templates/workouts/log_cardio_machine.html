@@ -62,9 +62,14 @@
           </select>
         </div>
         <div>
-          <label class="form-label">Distance (m)</label>
-          <input class="form-control" type="number" name="cardio[0][distance_m]" placeholder="1000"
-            style="font-family:'DM Mono',monospace;"/>
+          <label class="form-label">Distance (<span id="dist-label-0">m</span>)</label>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <input class="form-control" type="number" name="cardio[0][distance_m]" placeholder="1000"
+              style="font-family:'DM Mono',monospace;"/>
+            <input type="hidden" name="cardio[0][distance_unit]" id="dist-unit-0" value="m"/>
+            <button type="button" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 8px;"
+              onclick="toggleDistUnit(0)">m|mi</button>
+          </div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
@@ -114,6 +119,13 @@
 </form>
 
 <script>
+  function toggleDistUnit(idx) {
+    const unit = document.getElementById(`dist-unit-${idx}`);
+    const label = document.getElementById(`dist-label-${idx}`);
+    unit.value = unit.value === 'm' ? 'mi' : 'm';
+    label.textContent = unit.value;
+  }
+
   let cardioIdx = 1;
 
   function addCardioSet() {
@@ -144,9 +156,14 @@
           </select>
         </div>
         <div>
-          <label class="form-label">Distance (m)</label>
-          <input class="form-control" type="number" name="cardio[${idx}][distance_m]" placeholder="1000"
-            style="font-family:'DM Mono',monospace;"/>
+          <label class="form-label">Distance (<span id="dist-label-${idx}">m</span>)</label>
+          <div style="display:flex;gap:4px;align-items:center;">
+            <input class="form-control" type="number" name="cardio[${idx}][distance_m]" placeholder="1000"
+              style="font-family:'DM Mono',monospace;"/>
+            <input type="hidden" name="cardio[${idx}][distance_unit]" id="dist-unit-${idx}" value="m"/>
+            <button type="button" class="btn btn-secondary btn-sm" style="white-space:nowrap;padding:6px 8px;"
+              onclick="toggleDistUnit(${idx})">m|mi</button>
+          </div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">

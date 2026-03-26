@@ -97,8 +97,8 @@
     const filtered = q
       ? exercises.filter(ex => ex.name.toLowerCase().includes(q) || ex.group.toLowerCase().includes(q))
       : exercises;
-    if (!filtered.length) return '<div style="padding:10px 14px;color:var(--muted);font-size:13px;">No matches</div>';
     let html = '';
+    if (!filtered.length && !q) return '<div style="padding:10px 14px;color:var(--muted);font-size:13px;">No matches</div>';
     let curGroup = null;
     filtered.forEach(ex => {
       if (ex.group !== curGroup) {
@@ -109,7 +109,15 @@
         style="padding:10px 14px;cursor:pointer;font-size:14px;"
         onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background=''">${ex.name}</div>`;
     });
-    return html;
+    const hasExact = exercises.some(ex => ex.name.toLowerCase() === q);
+    if (q && !hasExact) {
+      html += `<div class="ex-opt" data-id="__add__" data-name="${q.replace(/"/g,'&quot;')}"
+        style="padding:10px 14px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);"
+        onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background=''">
+        ➕ Add "<strong>${q}</strong>" as new exercise
+      </div>`;
+    }
+    return html || '<div style="padding:10px 14px;color:var(--muted);font-size:13px;">No matches</div>';
   }
 
   function showExDrop(input, exIdx) {
@@ -140,6 +148,10 @@
     if (!opt) return;
     const id   = opt.dataset.id;
     const name = opt.dataset.name;
+    if (id === '__add__') {
+      createExerciseInline(name, exIdx);
+      return;
+    }
     const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
     block.querySelector('.ex-search-input').value  = name;
     block.querySelector('.exercise-id-input').value = id;
@@ -149,6 +161,29 @@
     block.querySelector('.ex-validate-msg')?.remove();
     syncExerciseToSets(exIdx);
     loadHistory(id, exIdx);
+  }
+
+  async function createExerciseInline(name, exIdx) {
+    document.getElementById(`ex-drop-${exIdx}`).style.display = 'none';
+    try {
+      const res = await fetch('/exercises/find-or-create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) { alert('Could not save exercise.'); return; }
+      const data = await res.json();
+      if (!exercises.find(e => e.id == data.id)) {
+        exercises.push({ id: data.id, name: data.name, group: data.muscle_group });
+      }
+      const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
+      block.querySelector('.ex-search-input').value   = data.name;
+      block.querySelector('.exercise-id-input').value = data.id;
+      block.style.borderColor = '';
+      block.querySelector('.ex-search-input').style.borderColor = '';
+      block.querySelector('.ex-validate-msg')?.remove();
+      syncExerciseToSets(exIdx);
+    } catch(e) { alert('Error creating exercise.'); }
   }
 
   // ── Exercise / cardio reorder ────────────────────────────
