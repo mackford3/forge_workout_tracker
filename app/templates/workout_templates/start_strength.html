@@ -1,25 +1,22 @@
 {% extends 'base.html' %}
-{% block title %}Start — {{ day.name }}{% endblock %}
+{% block title %}Start — {{ tmpl.name }}{% endblock %}
 
 {% block content %}
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-  <a href="{{ url_for('program.week', program_id=program.id, week_num=day.week_number) }}" class="btn btn-secondary btn-sm">← Back</a>
-  <h1 style="font-size:24px;margin:0;">{{ day.name }}</h1>
+  <a href="{{ url_for('plans.index') }}#templates-section" class="btn btn-secondary btn-sm">← Back</a>
+  <h1 style="font-size:24px;margin:0;">{{ tmpl.name }}</h1>
 </div>
 
-<div style="font-size:12px;color:var(--muted);margin-bottom:16px;">
-  Week {{ day.week_number }} · {{ day.day_of_week }} · {{ program.name }}
-</div>
+{% if tmpl.source %}
+<div style="font-size:12px;color:var(--muted);margin-bottom:16px;">{{ tmpl.source }}</div>
+{% endif %}
 
 <form method="post" action="{{ url_for('workouts.log_strength') }}" id="strength-form">
-  <!-- Hidden field to link back to program day after save -->
-  <input type="hidden" name="program_day_id" value="{{ day.id }}"/>
-
   <!-- Session info -->
   <div class="card" style="margin-bottom:10px;">
     <div class="form-group">
       <label class="form-label">Session Name</label>
-      <input class="form-control" name="name" value="{{ day.name }}" required/>
+      <input class="form-control" name="name" value="{{ tmpl.name }}" required/>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div class="form-group">
@@ -79,8 +76,8 @@ const allExercises = [
   {% endfor %}
 ];
 
-// Pre-matched exercises from program day
-const programExercises = [
+// Pre-matched exercises from template
+const templateExercises = [
   {% for m in matched %}
   { name: {{ m.name | tojson }}, exercise_id: {{ m.exercise.id if m.exercise else 'null' }} },
   {% endfor %}
@@ -90,7 +87,6 @@ let globalSetIndex    = 0;
 let globalCardioIndex = 0;
 let exerciseCount     = 0;
 
-// ── Exercise combobox helpers ──────────────────────────────
 function buildExDropdown(query) {
   const q = query.toLowerCase().trim();
   const filtered = q
@@ -204,7 +200,7 @@ function addExercise(selectedExerciseId = '', labelHint = '') {
       <button type="button" onclick="this.closest('.exercise-block').remove()"
         style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">✕</button>
     </div>
-    ${labelHint ? `<div style="font-size:10px;font-family:'DM Mono',monospace;margin-bottom:6px;${matchFailed ? 'color:#ff9800;' : 'color:var(--muted);'}">Program: ${labelHint}${matchFailed ? ' ⚠ not found — select manually' : ''}</div>` : ''}
+    ${labelHint ? `<div style="font-size:10px;font-family:'DM Mono',monospace;margin-bottom:6px;${matchFailed ? 'color:#ff9800;' : 'color:var(--muted);'}">Template: ${labelHint}${matchFailed ? ' ⚠ not found — select manually' : ''}</div>` : ''}
     <div class="form-group" style="margin-bottom:8px;padding-right:80px;">
       <label class="form-label">Exercise</label>
       <div style="position:relative;">
@@ -224,7 +220,6 @@ function addExercise(selectedExerciseId = '', labelHint = '') {
     <div id="history-${exIdx}" style="margin-bottom:4px;"></div>
     <div class="sets-row" id="sets-row-${exIdx}"
       style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;align-items:flex-end;"></div>
-
     <button type="button" onclick="addSet(${exIdx})" class="btn btn-secondary btn-full"
       style="margin-top:8px;border-style:dashed;font-size:13px;">+ Add Set</button>
   `;
@@ -300,7 +295,6 @@ function setGlobalUnit(unit) {
   document.querySelectorAll('.unit-select').forEach(s => s.value = unit);
 }
 
-// ── Form submit validation ─────────────────────────────────
 document.getElementById('strength-form').addEventListener('submit', function(e) {
   let invalid = false;
   document.querySelectorAll('.exercise-block').forEach(block => {
@@ -322,11 +316,11 @@ document.getElementById('strength-form').addEventListener('submit', function(e) 
   if (invalid) e.preventDefault();
 });
 
-// Auto-populate exercises from program day
-programExercises.forEach(pe => {
+// Auto-populate exercises from template
+templateExercises.forEach(pe => {
   addExercise(pe.exercise_id || '', pe.name);
 });
-if (programExercises.length === 0) addExercise();
+if (templateExercises.length === 0) addExercise();
 </script>
 <script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
 {% endblock %}

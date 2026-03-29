@@ -163,27 +163,20 @@
     loadHistory(id, exIdx);
   }
 
-  async function createExerciseInline(name, exIdx) {
+  function createExerciseInline(name, exIdx) {
     document.getElementById(`ex-drop-${exIdx}`).style.display = 'none';
-    try {
-      const res = await fetch('/exercises/find-or-create', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ name }),
-      });
-      if (!res.ok) { alert('Could not save exercise.'); return; }
-      const data = await res.json();
+    const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
+    ExerciseSearch.showCreateModal(name, exercises, block, (data) => {
       if (!exercises.find(e => e.id == data.id)) {
-        exercises.push({ id: data.id, name: data.name, group: data.muscle_group });
+        exercises.push({ id: data.id, name: data.name, group: data.muscle_group || '' });
       }
-      const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
       block.querySelector('.ex-search-input').value   = data.name;
       block.querySelector('.exercise-id-input').value = data.id;
       block.style.borderColor = '';
       block.querySelector('.ex-search-input').style.borderColor = '';
       block.querySelector('.ex-validate-msg')?.remove();
       syncExerciseToSets(exIdx);
-    } catch(e) { alert('Error creating exercise.'); }
+    });
   }
 
   // ── Exercise / cardio reorder ────────────────────────────
@@ -423,4 +416,5 @@
   // Start with one exercise block
   addExercise();
 </script>
+<script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
 {% endblock %}

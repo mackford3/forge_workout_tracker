@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block title %}New Circuit Template{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="{{ url_for('workout_templates.new_picker') }}" class="btn btn-secondary btn-sm">← Back</a>
+  <div>
+    <h1 style="font-size:24px;margin:0;">🔄 Circuit Template</h1>
+    <p style="color:var(--muted);font-size:13px;margin:2px 0 0;">AMRAP · EMOM · For Time</p>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('workout_templates.new_circuit') }}">
+  <div class="card" style="margin-bottom:10px;">
+    <div class="form-group">
+      <label class="form-label">Template Name</label>
+      <input class="form-control" name="name" placeholder="e.g. 20-min AMRAP" required/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Source <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <input class="form-control" name="source" placeholder="e.g. @username on TikTok"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <textarea class="form-control" name="description" rows="2" placeholder="Any notes..."></textarea>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div class="form-group">
+        <label class="form-label">Circuit Type</label>
+        <select class="form-control" name="circuit_type" id="circuit-type-sel" onchange="updateTypeHints()">
+          <option value="amrap" {{ 'selected' if circuit_type=='amrap' }}>AMRAP</option>
+          <option value="emom" {{ 'selected' if circuit_type=='emom' }}>EMOM</option>
+          <option value="fortime" {{ 'selected' if circuit_type=='fortime' }}>For Time</option>
+          <option value="circuit" {{ 'selected' if circuit_type=='circuit' }}>Circuit</option>
+        </select>
+      </div>
+      <div class="form-group" id="time-cap-field">
+        <label class="form-label" id="time-cap-label">Time Cap (min)</label>
+        <input class="form-control" type="number" name="time_cap_min" placeholder="20" id="time-cap-input"/>
+      </div>
+    </div>
+    <div class="form-group" id="rounds-field">
+      <label class="form-label" id="rounds-label">Rounds Target</label>
+      <input class="form-control" type="number" name="rounds_target" placeholder="3" id="rounds-input"/>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <h2 style="font-size:18px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:0;">EXERCISES</h2>
+  </div>
+
+  <div id="circuit-exercises-container"></div>
+
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;border-style:dashed;"
+          onclick="addCircuitExRow()">
+    + Add Exercise
+  </button>
+
+  <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;">
+    Save Template ✓
+  </button>
+</form>
+
+<script>
+  const exercises = [
+    {% for ex in exercises %}
+    { id: {{ ex.id }}, name: {{ ex.name | tojson }}, group: {{ (ex.muscle_group or '') | tojson }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  let circIdx = 0;
+
+  function addCircuitExRow(prefill = {}) {
+    const idx = circIdx++;
+    const row = document.createElement('div');
+    row.className = 'set-row card card-sm';
+    row.style.cssText = 'margin-bottom:8px;position:relative;';
+    row.innerHTML = `
+      <button type="button" onclick="this.closest('.set-row').remove()"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Exercise ${idx + 1}</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">Exercise</label>
+        <div data-exercise-wrap>
+          <input type="text" class="form-control ex-search-input"
+                 placeholder="Search exercises..." autocomplete="off"
+                 value="${(prefill.name || '').replace(/"/g,'&quot;')}"/>
+          <input type="hidden" class="exercise-id-input"
+                 name="exercises[${idx}][exercise_id]" value="${prefill.exercise_id || ''}"/>
+          <input type="hidden" name="exercises[${idx}][name]"
+                 class="exercise-name-hidden" value="${(prefill.name || '').replace(/"/g,'&quot;')}"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div>
+          <label class="form-label">Reps</label>
+          <input class="form-control" type="number" name="exercises[${idx}][reps]" placeholder="10" value="${prefill.reps || ''}"/>
+        </div>
+        <div>
+          <label class="form-label">Weight (lbs)</label>
+          <input class="form-control" type="number" step="0.5" name="exercises[${idx}][weight_lbs]" placeholder="0" value="${prefill.weight_lbs || ''}"/>
+        </div>
+        <div>
+          <label class="form-label">Distance (m)</label>
+          <input class="form-control" type="number" name="exercises[${idx}][distance_m]" placeholder="0" value="${prefill.distance_m || ''}"/>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:8px;">
+        <label class="form-label">Notes</label>
+        <input class="form-control" name="exercises[${idx}][notes]" placeholder="Optional" value="${(prefill.notes || '').replace(/"/g,'&quot;')}"/>
+      </div>
+    `;
+    document.getElementById('circuit-exercises-container').appendChild(row);
+
+    const inputEl  = row.querySelector('.ex-search-input');
+    const hiddenEl = row.querySelector('.exercise-id-input');
+    const nameEl   = row.querySelector('.exercise-name-hidden');
+    new ExerciseSearch(inputEl, exercises, {
+      hiddenInputEl: hiddenEl,
+      onSelect(ex) { nameEl.value = ex ? ex.name : ''; }
+    });
+    inputEl.addEventListener('blur', () => {
+      if (!hiddenEl.value) nameEl.value = inputEl.value.trim();
+    });
+  }
+
+  function updateTypeHints() {
+    const type = document.getElementById('circuit-type-sel').value;
+    const tcLabel = document.getElementById('time-cap-label');
+    const tcField = document.getElementById('time-cap-field');
+    const rndField = document.getElementById('rounds-field');
+    const rndLabel = document.getElementById('rounds-label');
+
+    if (type === 'amrap') {
+      tcLabel.textContent = 'Time Cap (min)';
+      tcField.style.display = '';
+      rndField.style.display = 'none';
+    } else if (type === 'emom') {
+      tcLabel.textContent = 'Total Duration (min)';
+      tcField.style.display = '';
+      rndField.style.display = 'none';
+    } else if (type === 'fortime') {
+      tcLabel.textContent = 'Time Cap (min)';
+      tcField.style.display = '';
+      rndLabel.textContent = 'Rounds';
+      rndField.style.display = '';
+    } else {
+      tcField.style.display = 'none';
+      rndLabel.textContent = 'Rounds Target';
+      rndField.style.display = '';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    updateTypeHints();
+    addCircuitExRow();
+  });
+</script>
+<script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
+{% endblock %}

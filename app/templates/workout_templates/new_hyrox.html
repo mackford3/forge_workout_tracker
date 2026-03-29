@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}New Hyrox Template{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="{{ url_for('workout_templates.new_picker') }}" class="btn btn-secondary btn-sm">← Back</a>
+  <div>
+    <h1 style="font-size:24px;margin:0;">🔥 Hyrox Template</h1>
+    <p style="color:var(--muted);font-size:13px;margin:2px 0 0;">Build a custom training session</p>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('workout_templates.new_hyrox') }}">
+  <div class="card" style="margin-bottom:10px;">
+    <div class="form-group">
+      <label class="form-label">Template Name</label>
+      <input class="form-control" name="name" id="tmpl-name" placeholder="e.g. Ski & Sled Combo" required
+             oninput="updatePreview()"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Source <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <input class="form-control" name="source" placeholder="e.g. @username on TikTok"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <textarea class="form-control" name="description" rows="2" placeholder="Any notes..."></textarea>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <h2 style="font-size:18px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:0;">STATIONS</h2>
+  </div>
+  <p style="color:var(--muted);font-size:12px;margin-bottom:10px;">Add each station in order. Use "1km Run" for run segments. Distance and reps are targets.</p>
+
+  <div id="stations-container"></div>
+
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;border-style:dashed;color:var(--hyrox);border-color:color-mix(in srgb,var(--hyrox) 40%,transparent);"
+          onclick="addStation()">
+    + Add Station
+  </button>
+
+  <!-- Preview -->
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">
+    PREVIEW
+  </div>
+  <div id="station-preview" class="card" style="margin-bottom:16px;min-height:44px;">
+    <span style="color:var(--muted);font-size:13px;">Add stations above to see preview</span>
+  </div>
+
+  <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;background:var(--hyrox);border-color:var(--hyrox);">
+    Save Template ✓
+  </button>
+</form>
+
+<script>
+let stIdx = 0;
+
+function addStation(name='', distanceM='', reps='') {
+  const idx = stIdx++;
+  const isRun = name.toLowerCase().includes('run');
+  const html = `<div class="hyrox-station-row set-row card card-sm" style="margin-bottom:8px;position:relative;" data-idx="${idx}">
+    <button type="button" onclick="removeStation(this)"
+      style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+    <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-right:30px;">Station ${idx + 1}</div>
+    <div class="form-group" style="margin-bottom:8px;">
+      <label class="form-label">Station Name</label>
+      <input class="form-control station-name" name="stations[${idx}][name]"
+             value="${name}" placeholder="e.g. 1km Run, SkiErg, Sled Push"
+             oninput="updatePreview()" autocomplete="off"/>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div>
+        <label class="form-label">Distance (m)</label>
+        <input class="form-control station-distance" type="number" name="stations[${idx}][distance_m]"
+               value="${distanceM}" placeholder="e.g. 1000, 50"
+               oninput="updatePreview()"/>
+      </div>
+      <div>
+        <label class="form-label">Reps</label>
+        <input class="form-control station-reps" type="number" name="stations[${idx}][reps]"
+               value="${reps}" placeholder="e.g. 80, 100"
+               oninput="updatePreview()"/>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('stations-container').insertAdjacentHTML('beforeend', html);
+  updatePreview();
+}
+
+function removeStation(btn) {
+  btn.closest('.hyrox-station-row').remove();
+  updatePreview();
+}
+
+function updatePreview() {
+  const rows = document.querySelectorAll('.hyrox-station-row');
+  const preview = document.getElementById('station-preview');
+  if (!rows.length) {
+    preview.innerHTML = '<span style="color:var(--muted);font-size:13px;">Add stations above to see preview</span>';
+    return;
+  }
+  let html = '';
+  rows.forEach((row, i) => {
+    const name = row.querySelector('.station-name')?.value || '';
+    const dist = row.querySelector('.station-distance')?.value || '';
+    const reps = row.querySelector('.station-reps')?.value || '';
+    const isRun = name.toLowerCase().includes('run');
+    const color = isRun ? 'var(--run)' : 'var(--hyrox)';
+    let detail = '';
+    if (dist) detail += dist + 'm';
+    if (reps) detail += (detail ? ' · ' : '') + reps + ' reps';
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;${i < rows.length - 1 ? 'border-bottom:1px solid var(--border);' : ''}">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${color};min-width:22px;">${i + 1}</span>
+      <span style="flex:1;font-size:14px;">${name || '<span style="color:var(--muted)">—</span>'}</span>
+      ${detail ? `<span style="font-size:11px;color:var(--muted);">${detail}</span>` : ''}
+    </div>`;
+  });
+  preview.innerHTML = html;
+}
+
+// Start with a 1km run as the first station
+document.addEventListener('DOMContentLoaded', function() {
+  addStation('1km Run', 1000, '');
+  addStation('', '', '');
+});
+</script>
+{% endblock %}

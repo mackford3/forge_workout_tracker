@@ -2,14 +2,14 @@
   <button type="button" onclick="removeRow(this)"
     style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
   <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Exercise {{ index + 1 }}</div>
-  <div class="form-group">
+  <div class="form-group" style="margin-bottom:8px;">
     <label class="form-label">Exercise</label>
-    <select class="form-control" name="exercises[{{ index }}][exercise_id]" required>
-      <option value="">Select exercise...</option>
-      {% for ex in exercises %}
-        <option value="{{ ex.id }}">{{ ex.name }}{% if ex.muscle_group %} ({{ ex.muscle_group }}){% endif %}</option>
-      {% endfor %}
-    </select>
+    <div data-exercise-wrap>
+      <input type="text" class="form-control ex-search-input"
+             placeholder="Search exercises..." autocomplete="off"/>
+      <input type="hidden" class="exercise-id-input"
+             name="exercises[{{ index }}][exercise_id]" required/>
+    </div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
     <div>

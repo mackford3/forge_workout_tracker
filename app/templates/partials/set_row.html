@@ -4,12 +4,12 @@
 
   <div class="form-group" style="margin-bottom:10px;">
     <label class="form-label">Exercise</label>
-    <select class="form-control" name="sets[{{ index }}][exercise_id]" required>
-      <option value="">Select exercise...</option>
-      {% for ex in exercises %}
-        <option value="{{ ex.id }}">{{ ex.name }}{% if ex.muscle_group %} ({{ ex.muscle_group }}){% endif %}</option>
-      {% endfor %}
-    </select>
+    <div data-exercise-wrap>
+      <input type="text" class="form-control ex-search-input"
+             placeholder="Search exercises..." autocomplete="off"/>
+      <input type="hidden" class="exercise-id-input"
+             name="sets[{{ index }}][exercise_id]" required/>
+    </div>
   </div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;align-items:end;">

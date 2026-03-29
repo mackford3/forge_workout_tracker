@@ -471,8 +471,29 @@ def log_hyrox_race():
 # ── Log Hyrox Training ─────────────────────────────────────
 @workouts_bp.route('/log/hyrox/training', methods=['GET', 'POST'])
 def log_hyrox_training():
-    preset_key = request.args.get('preset', 'full_sim')
-    preset     = HYROX_TRAINING_PRESETS.get(preset_key, HYROX_TRAINING_PRESETS['full_sim'])
+    template_id = request.args.get('template_id', type=int)
+    preset_key  = request.args.get('preset', 'full_sim')
+
+    if template_id:
+        from ..models import WorkoutTemplate
+        import json as _json
+        tmpl = WorkoutTemplate.query.get(template_id)
+        if tmpl and tmpl.workout_type == 'hyrox':
+            try:
+                tdata = _json.loads(tmpl.template_data) if tmpl.template_data else {}
+            except Exception:
+                tdata = {}
+            raw_stations = tdata.get('stations', [])
+            stations = [
+                (s.get('name', ''), i + 1, s.get('distance_m'), s.get('reps'))
+                for i, s in enumerate(raw_stations)
+            ]
+            preset = {'label': tmpl.name, 'default_name': tmpl.name, 'stations': stations}
+        else:
+            template_id = None
+            preset = HYROX_TRAINING_PRESETS.get(preset_key, HYROX_TRAINING_PRESETS['full_sim'])
+    else:
+        preset = HYROX_TRAINING_PRESETS.get(preset_key, HYROX_TRAINING_PRESETS['full_sim'])
 
     if request.method == 'POST':
         f = request.form
@@ -495,7 +516,7 @@ def log_hyrox_training():
             running_time_s = _time_to_seconds(f.get('running_time')),
             workout_time_s = _time_to_seconds(f.get('workout_time')),
             location       = f.get('venue'),
-            race_type      = f'training_{preset_key}',
+            race_type      = f'training_template_{template_id}' if template_id else f'training_{preset_key}',
         )
         db.session.add(result)
         db.session.flush()

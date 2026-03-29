@@ -120,31 +120,24 @@
     {% endfor %}
   ];
 
-  function buildOptions() {
-    let html = '<option value="">Select exercise...</option>';
-    let curGroup = null;
-    EXERCISES.forEach(ex => {
-      if (ex.group !== curGroup) {
-        if (curGroup !== null) html += '</optgroup>';
-        html += `<optgroup label="${ex.group || 'Other'}">`;
-        curGroup = ex.group;
-      }
-      html += `<option value="${ex.id}">${ex.name}${ex.group ? ' (' + ex.group + ')' : ''}</option>`;
-    });
-    if (curGroup !== null) html += '</optgroup>';
-    return html;
-  }
-
   function addExercise() {
     const unit = document.getElementById('global-unit').value;
     const idx  = exIdx++;
-    const row  = `<div class="set-row card card-sm" style="margin-bottom:8px;position:relative;">
+    const row  = document.createElement('div');
+    row.className = 'set-row card card-sm';
+    row.style.cssText = 'margin-bottom:8px;position:relative;';
+    row.innerHTML = `
       <button type="button" onclick="removeRow(this)"
         style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
       <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Exercise ${idx + 1}</div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:8px;">
         <label class="form-label">Exercise</label>
-        <select class="form-control" name="exercises[${idx}][exercise_id]" required>${buildOptions()}</select>
+        <div data-exercise-wrap>
+          <input type="text" class="form-control ex-search-input"
+                 placeholder="Search exercises..." autocomplete="off"/>
+          <input type="hidden" class="exercise-id-input"
+                 name="exercises[${idx}][exercise_id]" required/>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
         <div>
@@ -177,11 +170,14 @@
         <label class="form-label">Notes</label>
         <input class="form-control" name="exercises[${idx}][notes]" placeholder="Optional"/>
       </div>
-    </div>`;
-    document.getElementById('circuit-exercises-container').insertAdjacentHTML('beforeend', row);
+    `;
+    document.getElementById('circuit-exercises-container').appendChild(row);
+    new ExerciseSearch(row.querySelector('.ex-search-input'), EXERCISES,
+                       { hiddenInputEl: row.querySelector('.exercise-id-input') });
   }
 
   function setUnit(unit) { document.querySelectorAll('.unit-select').forEach(s => s.value = unit); }
   function removeRow(btn) { btn.closest('.set-row').remove(); }
 </script>
+<script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
 {% endblock %}
