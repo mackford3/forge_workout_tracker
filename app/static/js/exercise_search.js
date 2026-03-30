@@ -180,6 +180,9 @@ class ExerciseSearch {
   _render() {
     this._dropEl.innerHTML = this._buildHtml(this.inputEl.value);
     this._dropEl.style.display = 'block';
+    // Lift the containing card above sibling cards so the dropdown isn't clipped
+    const card = this.inputEl.closest('.set-row, .exercise-block, .card');
+    if (card) { card.style.position = 'relative'; card.style.zIndex = '20'; }
   }
 
   _onInput() {
@@ -190,6 +193,8 @@ class ExerciseSearch {
 
   _hide() {
     this._dropEl.style.display = 'none';
+    const card = this.inputEl.closest('.set-row, .exercise-block, .card');
+    if (card) card.style.zIndex = '';
   }
 
   _onDropClick(e) {

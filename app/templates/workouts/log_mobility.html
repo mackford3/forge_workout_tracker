@@ -49,7 +49,18 @@
       <label class="form-label">Focus Areas</label>
       <input class="form-control" name="focus_areas" placeholder="e.g. hips / shoulders / ankles"/>
     </div>
-    <div class="form-group">
+  </div>
+
+  <!-- Exercises / Poses -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;margin-top:4px;">
+    <h2 style="font-size:16px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:0;">Exercises / Poses</h2>
+    <span style="font-size:11px;color:var(--muted);">optional</span>
+  </div>
+  <div id="exercises-list" style="margin-bottom:8px;"></div>
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;border-style:dashed;font-size:13px;" onclick="addExerciseRow()">+ Add Exercise / Pose</button>
+
+  <div class="card" style="margin-bottom:12px;">
+    <div class="form-group" style="margin-bottom:0;">
       <label class="form-label">Notes</label>
       <textarea class="form-control" name="notes" rows="3" placeholder="How did it feel? Any highlights..."></textarea>
     </div>
@@ -61,6 +72,26 @@
 </form>
 
 <script>
+  let exRowIdx = 0;
+
+  function addExerciseRow(name = '', duration = '') {
+    const idx = exRowIdx++;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;';
+    row.innerHTML = `
+      <input class="form-control" type="text" name="exercises[${idx}][name]"
+             placeholder="e.g. Downward Dog, Pigeon Pose…" value="${name}"
+             style="flex:1;"/>
+      <input class="form-control" type="text" name="exercises[${idx}][duration]"
+             placeholder="e.g. 60s, 5 min" value="${duration}"
+             style="width:90px;flex-shrink:0;font-size:13px;"/>
+      <button type="button" onclick="this.closest('div').remove()"
+              style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;padding:0 4px;">✕</button>
+    `;
+    document.getElementById('exercises-list').appendChild(row);
+    row.querySelector('input[name$="[name]"]').focus();
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     const dt = document.querySelector('input[type="datetime-local"]');
     if (dt && !dt.value) {

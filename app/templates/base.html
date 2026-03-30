@@ -442,30 +442,17 @@
           <div class="lc-sub">Fitness Tests &amp; PRs</div>
         </a>
       </div>
-      {% if workout_templates %}
-      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
-        <div style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">FROM TEMPLATE</div>
-        {% for tmpl in workout_templates[:4] %}
-        <a href="{{ url_for('workout_templates.start', tmpl_id=tmpl.id) }}"
-           style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;text-decoration:none;color:var(--text);margin-bottom:6px;">
-          <div style="font-size:18px;">{{ '🏋️' if tmpl.workout_type == 'strength' else ('🔄' if tmpl.workout_type == 'circuit' else '🔥') }}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ tmpl.name }}</div>
-            {% if tmpl.source %}
-            <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ tmpl.source }}</div>
-            {% endif %}
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+        <a href="{{ url_for('workout_templates.select') }}"
+           style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;text-decoration:none;color:var(--text);">
+          <div style="font-size:22px;">📋</div>
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:14px;">Select Existing Workout</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Start from a saved template</div>
           </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
         </a>
-        {% endfor %}
-        {% if workout_templates | length > 4 %}
-        <a href="{{ url_for('plans.index') }}#templates-section"
-           style="font-size:12px;color:var(--muted);text-decoration:none;display:block;text-align:center;padding-top:4px;">
-          See all {{ workout_templates | length }} templates →
-        </a>
-        {% endif %}
       </div>
-      {% endif %}
     </div>
   </div>
 

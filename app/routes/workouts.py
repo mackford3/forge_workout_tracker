@@ -402,6 +402,17 @@ def log_mobility():
             notes_parts.append('Type: ' + type_labels.get(f['mobility_type'], f['mobility_type']))
         if f.get('focus_areas'):
             notes_parts.append('Focus: ' + f['focus_areas'])
+        # Collect exercises list
+        ex_lines = []
+        i = 0
+        while f.get(f'exercises[{i}][name]') is not None:
+            ex_name = f.get(f'exercises[{i}][name]', '').strip()
+            ex_dur  = f.get(f'exercises[{i}][duration]', '').strip()
+            if ex_name:
+                ex_lines.append(f'  - {ex_name}' + (f' ({ex_dur})' if ex_dur else ''))
+            i += 1
+        if ex_lines:
+            notes_parts.append('Exercises:\n' + '\n'.join(ex_lines))
         if f.get('notes'):
             notes_parts.append(f['notes'])
         combined_notes = '\n'.join(notes_parts) or None
