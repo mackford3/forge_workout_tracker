@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+{% block title %}Select Workout Template{% endblock %}
+
+{% block head %}
+<style>
+  .tmpl-filter-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+  .tmpl-card { cursor:default; }
+
+  /* Collapsible exercise list */
+  .tmpl-detail { overflow:hidden; transition:max-height .25s ease, opacity .2s ease; }
+  .tmpl-detail.collapsed { max-height:0 !important; opacity:0; pointer-events:none; }
+
+  /* Pill chips for stats */
+  .stat-chip {
+    display:inline-block;
+    font-family:'DM Mono',monospace;
+    font-size:10px;
+    padding:2px 7px;
+    border-radius:4px;
+    background:var(--surface2);
+    border:1px solid var(--border);
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  /* Exercise row */
+  .ex-row { display:flex; align-items:baseline; gap:8px; padding:5px 0; font-size:13px; }
+  .ex-row:not(:last-child) { border-bottom:1px solid var(--border); }
+  .ex-num {
+    font-family:'Bebas Neue',sans-serif;
+    font-size:16px;
+    min-width:20px;
+    flex-shrink:0;
+  }
+  .ex-name { flex:1; min-width:0; }
+  .ex-meta { font-size:11px; color:var(--muted); white-space:nowrap; }
+
+  /* Toggle chevron */
+  .toggle-btn {
+    background:none; border:none; cursor:pointer;
+    color:var(--muted); font-size:12px; padding:0;
+    display:flex; align-items:center; gap:4px;
+    transition:color .15s;
+  }
+  .toggle-btn:hover { color:var(--text); }
+  .toggle-chevron { transition:transform .2s ease; display:inline-block; }
+  .toggle-chevron.open { transform:rotate(90deg); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="javascript:history.back()" class="btn btn-secondary btn-sm">← Back</a>
+  <h1 style="font-size:24px;margin:0;">Select Workout</h1>
+</div>
+
+{% if templates %}
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+  <input id="tmpl-search" type="search" placeholder="Search templates…"
+    class="form-control" style="flex:1;min-width:160px;font-size:13px;"
+    oninput="filterTemplates()"/>
+  <div style="display:flex;gap:4px;">
+    <button class="btn btn-secondary btn-sm tmpl-filter-btn active" data-type="all" onclick="setFilter('all')">All</button>
+    <button class="btn btn-secondary btn-sm tmpl-filter-btn" data-type="strength" onclick="setFilter('strength')">🏋️</button>
+    <button class="btn btn-secondary btn-sm tmpl-filter-btn" data-type="circuit" onclick="setFilter('circuit')">🔄</button>
+    <button class="btn btn-secondary btn-sm tmpl-filter-btn" data-type="hyrox" onclick="setFilter('hyrox')">🔥</button>
+  </div>
+</div>
+
+{% for tmpl in templates %}
+{% set wtype = tmpl.workout_type %}
+{% set p     = tmpl._parsed if tmpl._parsed is mapping else {} %}
+
+{# ── derived values ── #}
+{% if wtype == 'strength' %}
+  {% set type_icon   = '🏋️' %}
+  {% set badge_label = 'STRENGTH' %}
+  {% set ex_list     = p.get('exercises', []) %}
+  {% set accent_var  = 'var(--strength)' %}
+{% elif wtype == 'circuit' %}
+  {% set type_icon   = '🔄' %}
+  {% set ct_labels   = {'amrap': 'AMRAP', 'emom': 'EMOM', 'fortime': 'FOR TIME', 'circuit': 'CIRCUIT'} %}
+  {% set badge_label = ct_labels.get(p.get('circuit_type', 'circuit'), 'CIRCUIT') %}
+  {% set ex_list     = p.get('exercises', []) %}
+  {% set accent_var  = 'var(--circuit)' %}
+{% else %}
+  {% set type_icon   = '🔥' %}
+  {% set badge_label = 'HYROX' %}
+  {% set ex_list     = p.get('stations', []) %}
+  {% set accent_var  = 'var(--hyrox)' %}
+{% endif %}
+{% set item_count = ex_list | length %}
+{% set card_id    = 'tmpl-' ~ tmpl.id %}
+
+<div class="card tmpl-card" data-type="{{ wtype }}"
+     data-name="{{ (tmpl.name ~ ' ' ~ (tmpl.source or '')) | lower }}"
+     style="margin-bottom:10px;padding-bottom:14px;">
+
+  {# ── Header row ── #}
+  <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+        <span style="font-weight:700;font-size:16px;">{{ tmpl.name }}</span>
+        <span class="badge" style="
+          {% if wtype == 'strength' %}background:color-mix(in srgb,var(--strength) 15%,transparent);color:var(--strength);border-color:color-mix(in srgb,var(--strength) 30%,transparent);
+          {% elif wtype == 'circuit' %}background:color-mix(in srgb,var(--circuit) 15%,transparent);color:var(--circuit);border-color:color-mix(in srgb,var(--circuit) 30%,transparent);
+          {% else %}background:color-mix(in srgb,var(--hyrox) 15%,transparent);color:var(--hyrox);border-color:color-mix(in srgb,var(--hyrox) 30%,transparent);
+          {% endif %}font-size:10px;">{{ type_icon }} {{ badge_label }}</span>
+      </div>
+      {% if tmpl.source %}
+      <div style="font-size:12px;color:var(--muted);">{{ tmpl.source }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Summary chips ── #}
+  {% if item_count > 0 %}
+  <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;">
+    <span class="stat-chip">{{ item_count }} {{ 'station' if wtype == 'hyrox' else 'exercise' }}{{ 's' if item_count != 1 }}</span>
+    {% if wtype == 'strength' %}
+      {% set focus_val = p.get('focus', '') %}
+      {% if focus_val %}
+        {% set focus_labels = {'push':'Push','pull':'Pull','legs':'Legs','full_body':'Full Body','upper':'Upper','lower':'Lower','core':'Core','cardio':'Cardio','other':'Other'} %}
+        <span class="stat-chip">{{ focus_labels.get(focus_val, focus_val) }}</span>
+      {% endif %}
+    {% elif wtype == 'circuit' %}
+      {% if p.get('rounds_target') %}<span class="stat-chip">{{ p.rounds_target }} rounds</span>{% endif %}
+      {% if p.get('time_cap_min') %}<span class="stat-chip">{{ p.time_cap_min }} min cap</span>{% endif %}
+    {% elif wtype == 'hyrox' %}
+      {# count runs vs workouts #}
+      {% set run_count = ex_list | selectattr('name', 'search', '(?i)run') | list | length %}
+      {% set work_count = item_count - run_count %}
+      {% if run_count %}<span class="stat-chip">{{ run_count }}× run</span>{% endif %}
+      {% if work_count %}<span class="stat-chip">{{ work_count }} stations</span>{% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── Exercise list (collapsible) ── #}
+  {% if item_count > 0 %}
+  <div style="margin-bottom:10px;">
+    <button class="toggle-btn" onclick="toggleDetail('{{ card_id }}', this)">
+      <span class="toggle-chevron open">▶</span>
+      <span class="toggle-label">Hide exercises</span>
+    </button>
+    <div id="{{ card_id }}-detail" class="tmpl-detail"
+         style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;max-height:2000px;opacity:1;">
+      {% for item in ex_list %}
+        {% if item is mapping %}
+          {% set ex_name = item.get('exercise_name') or item.get('name') or '—' %}
+        {% else %}
+          {% set ex_name = item %}
+        {% endif %}
+
+        {# colour coding #}
+        {% if wtype == 'hyrox' %}
+          {% if 'run' in ex_name | lower %}
+            {% set num_color = 'var(--run)' %}
+          {% else %}
+            {% set num_color = 'var(--hyrox)' %}
+          {% endif %}
+        {% elif wtype == 'circuit' %}
+          {% set num_color = 'var(--circuit)' %}
+        {% else %}
+          {% set num_color = 'var(--strength)' %}
+        {% endif %}
+
+        <div class="ex-row">
+          <span class="ex-num" style="color:{{ num_color }};">{{ loop.index }}</span>
+          <span class="ex-name">{{ ex_name }}</span>
+          <span class="ex-meta">
+            {% if item is mapping %}
+              {% if wtype == 'strength' %}
+                {{ item.get('sets_reps') or '' }}
+              {% elif wtype == 'circuit' %}
+                {% set parts = [] %}
+                {% if item.get('reps') %}{% set _ = parts.append(item.reps ~ ' reps') %}{% endif %}
+                {% if item.get('weight_lbs') %}{% set _ = parts.append((item.weight_lbs | int) ~ ' lbs') %}{% endif %}
+                {% if item.get('distance_m') %}{% set _ = parts.append(item.distance_m ~ 'm') %}{% endif %}
+                {{ parts | join(' · ') }}
+              {% elif wtype == 'hyrox' %}
+                {% set parts = [] %}
+                {% if item.get('distance_m') %}{% set _ = parts.append(item.distance_m ~ 'm') %}{% endif %}
+                {% if item.get('reps') %}{% set _ = parts.append(item.reps ~ ' reps') %}{% endif %}
+                {{ parts | join(' · ') }}
+              {% endif %}
+            {% endif %}
+          </span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <a href="{{ url_for('workout_templates.start', tmpl_id=tmpl.id) }}"
+     class="btn btn-primary btn-full" style="font-size:15px;padding:13px;">
+    Start Workout →
+  </a>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="card" style="text-align:center;padding:40px 20px;color:var(--muted);">
+  <div style="font-size:36px;margin-bottom:10px;">📋</div>
+  <div style="font-weight:600;margin-bottom:6px;">No templates yet</div>
+  <div style="font-size:13px;margin-bottom:16px;">Save a workout routine to reuse it here.</div>
+  <a href="{{ url_for('workout_templates.new_picker') }}" class="btn btn-primary btn-sm">Create Template</a>
+</div>
+{% endif %}
+
+<script>
+  let _tmplFilter = 'all';
+
+  function setFilter(type) {
+    _tmplFilter = type;
+    document.querySelectorAll('.tmpl-filter-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.type === type);
+    });
+    filterTemplates();
+  }
+
+  function filterTemplates() {
+    const q = document.getElementById('tmpl-search')?.value.toLowerCase() ?? '';
+    document.querySelectorAll('.tmpl-card').forEach(card => {
+      const matchType   = _tmplFilter === 'all' || card.dataset.type === _tmplFilter;
+      const matchSearch = !q || card.dataset.name.includes(q);
+      card.style.display = (matchType && matchSearch) ? '' : 'none';
+    });
+  }
+
+  function toggleDetail(cardId, btn) {
+    const detail  = document.getElementById(cardId + '-detail');
+    const chevron = btn.querySelector('.toggle-chevron');
+    const label   = btn.querySelector('.toggle-label');
+    const isOpen  = !detail.classList.contains('collapsed');
+    if (isOpen) {
+      detail.style.maxHeight = detail.scrollHeight + 'px';
+      requestAnimationFrame(() => {
+        detail.style.maxHeight = '0';
+        detail.style.opacity   = '0';
+      });
+      detail.classList.add('collapsed');
+      chevron.classList.remove('open');
+      label.textContent = 'Show exercises';
+    } else {
+      detail.classList.remove('collapsed');
+      detail.style.maxHeight = detail.scrollHeight + 'px';
+      detail.style.opacity   = '1';
+      chevron.classList.add('open');
+      label.textContent = 'Hide exercises';
+      // reset max-height to allow dynamic content
+      detail.addEventListener('transitionend', () => {
+        detail.style.maxHeight = '2000px';
+      }, { once: true });
+    }
+  }
+</script>
+{% endblock %}

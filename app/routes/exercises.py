@@ -79,7 +79,8 @@ def find_or_create():
         })
 
     muscle_group = (data.get('muscle_group') or '').strip() or None
-    ex = Exercise(name=name, muscle_group=muscle_group, category='strength')
+    category     = (data.get('category') or 'strength').strip()
+    ex = Exercise(name=name, muscle_group=muscle_group, category=category)
     db.session.add(ex)
     db.session.commit()
     return jsonify({

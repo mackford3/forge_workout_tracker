@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Add Workout Template{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="{{ url_for('plans.index') }}#templates-section" class="btn btn-secondary btn-sm">← Back</a>
+  <h1 style="font-size:24px;margin:0;">Add Template</h1>
+</div>
+
+<p style="color:var(--muted);font-size:14px;margin-bottom:20px;">Choose the type of workout you want to save as a template.</p>
+
+<div class="log-grid">
+  <a href="{{ url_for('workout_templates.new_strength') }}" class="log-card" style="border-color:color-mix(in srgb, var(--strength) 30%, transparent)">
+    <div class="lc-icon">🏋️</div>
+    <div class="lc-label" style="color:var(--strength)">Strength</div>
+    <div class="lc-sub">Exercise list with sets & reps</div>
+  </a>
+  <a href="{{ url_for('workout_templates.new_circuit') }}?type=amrap" class="log-card" style="border-color:color-mix(in srgb, var(--circuit) 30%, transparent)">
+    <div class="lc-icon">🔄</div>
+    <div class="lc-label" style="color:var(--circuit)">Circuit</div>
+    <div class="lc-sub">AMRAP · EMOM · For Time</div>
+  </a>
+  <a href="{{ url_for('workout_templates.new_hyrox') }}" class="log-card" style="border-color:color-mix(in srgb, var(--hyrox) 30%, transparent)">
+    <div class="lc-icon">🔥</div>
+    <div class="lc-label" style="color:var(--hyrox)">Hyrox</div>
+    <div class="lc-sub">Training simulation preset</div>
+  </a>
+</div>
+{% endblock %}

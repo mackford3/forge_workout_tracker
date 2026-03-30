@@ -68,6 +68,7 @@ def create_app():
     from .routes.program import program_bp
     from .routes.exercises import exercises_bp
     from .routes.premade import premade_bp
+    from .routes.workout_templates import workout_templates_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(workouts_bp,  url_prefix='/workouts')
@@ -76,6 +77,18 @@ def create_app():
     app.register_blueprint(program_bp, url_prefix='/program')
     app.register_blueprint(exercises_bp, url_prefix='/exercises')
     app.register_blueprint(premade_bp, url_prefix='/benchmarks')
+    app.register_blueprint(workout_templates_bp, url_prefix='/plans/templates')
+
+    @app.context_processor
+    def inject_workout_templates():
+        """Make workout_templates available in all templates for the log modal."""
+        from .models import WorkoutTemplate
+        try:
+            tmpl = WorkoutTemplate.query.order_by(
+                WorkoutTemplate.created_at.desc()).limit(10).all()
+            return dict(workout_templates=tmpl)
+        except Exception:
+            return dict(workout_templates=[])
 
     @app.context_processor
     def inject_globals():

@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}New Strength Template{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="{{ url_for('workout_templates.new_picker') }}" class="btn btn-secondary btn-sm">← Back</a>
+  <div>
+    <h1 style="font-size:24px;margin:0;">🏋️ Strength Template</h1>
+    <p style="color:var(--muted);font-size:13px;margin:2px 0 0;">Exercise list with sets &amp; reps</p>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('workout_templates.new_strength') }}" id="strength-tmpl-form">
+  <div class="card" style="margin-bottom:10px;">
+    <div class="form-group">
+      <label class="form-label">Template Name</label>
+      <input class="form-control" name="name" placeholder="e.g. Push Day A" required/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Source <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <input class="form-control" name="source" placeholder="e.g. @username on TikTok"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Focus <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <select class="form-control" name="focus">
+        <option value="">— Select focus —</option>
+        <option value="push">Push</option>
+        <option value="pull">Pull</option>
+        <option value="legs">Legs</option>
+        <option value="full_body">Full Body</option>
+        <option value="upper">Upper Body</option>
+        <option value="lower">Lower Body</option>
+        <option value="core">Core</option>
+        <option value="cardio">Cardio</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <textarea class="form-control" name="description" rows="2" placeholder="Any notes about this workout..."></textarea>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <h2 style="font-size:18px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:0;">EXERCISES</h2>
+  </div>
+  <p style="color:var(--muted);font-size:12px;margin-bottom:10px;">Search for each exercise and optionally add sets &amp; reps notation (e.g. "4x8-10").</p>
+
+  <div id="exercises-container"></div>
+
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;border-style:dashed;"
+          onclick="addExRow()">
+    + Add Exercise
+  </button>
+
+  <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;">
+    Save Template ✓
+  </button>
+</form>
+
+<script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
+<script>
+  const exercises = [
+    {% for ex in exercises %}
+    { id: {{ ex.id }}, name: {{ ex.name | tojson }}, group: {{ (ex.muscle_group or '') | tojson }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  let exRowIdx = 0;
+
+  function addExRow(prefill = {}) {
+    const idx = exRowIdx++;
+    const row = document.createElement('div');
+    row.className = 'set-row card card-sm';
+    row.style.cssText = 'margin-bottom:8px;position:relative;';
+    row.innerHTML = `
+      <button type="button" onclick="this.closest('.set-row').remove()"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-right:30px;">Exercise ${idx + 1}</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">Exercise</label>
+        <div data-exercise-wrap>
+          <input type="text" class="form-control ex-search-input"
+                 placeholder="Search exercises..." autocomplete="off"
+                 value="${(prefill.exercise_name || '').replace(/"/g,'&quot;')}"/>
+          <input type="hidden" class="exercise-id-input"
+                 name="exercises[${idx}][exercise_id]"
+                 value="${prefill.exercise_id || ''}"/>
+          <input type="hidden" name="exercises[${idx}][exercise_name]"
+                 class="exercise-name-hidden" value="${(prefill.exercise_name || '').replace(/"/g,'&quot;')}"/>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Sets &amp; Reps <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+        <input class="form-control" type="text" name="exercises[${idx}][sets_reps]"
+               placeholder="e.g. 4x8-10" value="${(prefill.sets_reps || '').replace(/"/g,'&quot;')}"/>
+      </div>
+    `;
+    document.getElementById('exercises-container').appendChild(row);
+
+    const inputEl  = row.querySelector('.ex-search-input');
+    const hiddenEl = row.querySelector('.exercise-id-input');
+    const nameEl   = row.querySelector('.exercise-name-hidden');
+
+    new ExerciseSearch(inputEl, exercises, {
+      hiddenInputEl: hiddenEl,
+      onSelect(ex) {
+        nameEl.value = ex ? ex.name : '';
+      }
+    });
+
+    // Sync name hidden field on blur too (in case user typed without selecting)
+    inputEl.addEventListener('blur', () => {
+      if (!hiddenEl.value) nameEl.value = inputEl.value.trim();
+    });
+  }
+
+  // Form submit: ensure exercise_name is always filled from the search input text
+  document.getElementById('strength-tmpl-form').addEventListener('submit', () => {
+    document.querySelectorAll('.exercise-name-hidden').forEach((nameEl, i) => {
+      const wrap = nameEl.closest('[data-exercise-wrap]');
+      if (wrap && !nameEl.value) {
+        nameEl.value = wrap.querySelector('.ex-search-input')?.value.trim() || '';
+      }
+    });
+  });
+
+  document.addEventListener('DOMContentLoaded', () => addExRow());
+</script>
+{% endblock %}

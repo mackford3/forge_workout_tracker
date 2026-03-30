@@ -1,0 +1,356 @@
+{% extends 'base.html' %}
+{% block title %}Edit Template — {{ tmpl.name }}{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+  <a href="{{ url_for('plans.index') }}#templates-section" class="btn btn-secondary btn-sm">← Back</a>
+  <h1 style="font-size:24px;margin:0;">Edit Template</h1>
+</div>
+
+<form method="post" action="{{ url_for('workout_templates.edit', tmpl_id=tmpl.id) }}">
+  <div class="card" style="margin-bottom:10px;">
+    <div class="form-group">
+      <label class="form-label">Template Name</label>
+      <input class="form-control" name="name" value="{{ tmpl.name }}" required/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Source <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <input class="form-control" name="source" value="{{ tmpl.source or '' }}" placeholder="e.g. @username on TikTok"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <textarea class="form-control" name="description" rows="2">{{ tmpl.description or '' }}</textarea>
+    </div>
+  </div>
+
+  {% if tmpl.workout_type == 'strength' %}
+  <!-- Strength: focus dropdown + exercise search rows -->
+  {% set focus_val = parsed.get('focus', '') if parsed is mapping else '' %}
+  {% set ex_lines = parsed.get('exercises', []) if parsed is mapping else (parsed if parsed is iterable else []) %}
+  <div class="card" style="margin-bottom:10px;">
+    <div class="form-group">
+      <label class="form-label">Focus <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+      <select class="form-control" name="focus">
+        <option value="">— Select focus —</option>
+        <option value="push" {{ 'selected' if focus_val == 'push' }}>Push</option>
+        <option value="pull" {{ 'selected' if focus_val == 'pull' }}>Pull</option>
+        <option value="legs" {{ 'selected' if focus_val == 'legs' }}>Legs</option>
+        <option value="full_body" {{ 'selected' if focus_val == 'full_body' }}>Full Body</option>
+        <option value="upper" {{ 'selected' if focus_val == 'upper' }}>Upper Body</option>
+        <option value="lower" {{ 'selected' if focus_val == 'lower' }}>Lower Body</option>
+        <option value="core" {{ 'selected' if focus_val == 'core' }}>Core</option>
+        <option value="cardio" {{ 'selected' if focus_val == 'cardio' }}>Cardio</option>
+        <option value="other" {{ 'selected' if focus_val == 'other' }}>Other</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="edit-exercises-container">
+    {% for item in ex_lines %}
+      {% if item is string %}
+        {% set ex_name = item %}
+        {% set ex_id = '' %}
+        {% set ex_sets_reps = '' %}
+      {% else %}
+        {% set ex_name = item.get('exercise_name', '') %}
+        {% set ex_id = item.get('exercise_id', '') or '' %}
+        {% set ex_sets_reps = item.get('sets_reps', '') or '' %}
+      {% endif %}
+    <div class="set-row card card-sm" style="margin-bottom:8px;position:relative;">
+      <button type="button" onclick="this.closest('.set-row').remove()"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-right:30px;">Exercise {{ loop.index }}</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">Exercise</label>
+        <div data-exercise-wrap>
+          <input type="text" class="form-control ex-search-input"
+                 placeholder="Search exercises..." autocomplete="off"
+                 value="{{ ex_name }}"/>
+          <input type="hidden" class="exercise-id-input"
+                 name="exercises[{{ loop.index0 }}][exercise_id]"
+                 value="{{ ex_id }}"/>
+          <input type="hidden" name="exercises[{{ loop.index0 }}][exercise_name]"
+                 class="exercise-name-hidden" value="{{ ex_name }}"/>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Sets &amp; Reps <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+        <input class="form-control" type="text" name="exercises[{{ loop.index0 }}][sets_reps]"
+               placeholder="e.g. 4x8-10" value="{{ ex_sets_reps }}"/>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;border-style:dashed;"
+          onclick="addStrengthRow()">+ Add Exercise</button>
+
+  {% elif tmpl.workout_type == 'circuit' %}
+  <!-- Circuit: type, time cap, exercise list -->
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">Circuit Type</label>
+        <select class="form-control" name="circuit_type">
+          <option value="amrap" {{ 'selected' if parsed.get('circuit_type')=='amrap' }}>AMRAP</option>
+          <option value="emom" {{ 'selected' if parsed.get('circuit_type')=='emom' }}>EMOM</option>
+          <option value="fortime" {{ 'selected' if parsed.get('circuit_type')=='fortime' }}>For Time</option>
+          <option value="circuit" {{ 'selected' if parsed.get('circuit_type')=='circuit' }}>Circuit</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Time Cap (min)</label>
+        <input class="form-control" type="number" name="time_cap_min" value="{{ parsed.get('time_cap_min') or '' }}" placeholder="20"/>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Rounds Target</label>
+      <input class="form-control" type="number" name="rounds_target" value="{{ parsed.get('rounds_target') or '' }}" placeholder="3"/>
+    </div>
+  </div>
+  <div id="circuit-exercises-container">
+    {% set circ_exercises = parsed.get('exercises', []) %}
+    {% for ex in circ_exercises %}
+    <div class="set-row card card-sm" style="margin-bottom:8px;position:relative;">
+      <button type="button" onclick="this.closest('.set-row').remove()"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Exercise {{ loop.index }}</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">Exercise</label>
+        <div data-exercise-wrap>
+          <input type="text" class="form-control ex-search-input"
+                 placeholder="Search exercises..." autocomplete="off"
+                 value="{{ ex.name }}"/>
+          <input type="hidden" class="exercise-id-input"
+                 name="exercises[{{ loop.index0 }}][exercise_id]"
+                 value="{{ ex.exercise_id if ex.exercise_id else '' }}"/>
+          <input type="hidden" name="exercises[{{ loop.index0 }}][name]"
+                 class="exercise-name-hidden" value="{{ ex.name }}"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div>
+          <label class="form-label">Reps</label>
+          <input class="form-control" type="number" name="exercises[{{ loop.index0 }}][reps]" value="{{ ex.reps or '' }}" placeholder="10"/>
+        </div>
+        <div>
+          <label class="form-label">Weight (lbs)</label>
+          <input class="form-control" type="number" step="0.5" name="exercises[{{ loop.index0 }}][weight_lbs]" value="{{ ex.weight_lbs or '' }}" placeholder="0"/>
+        </div>
+        <div>
+          <label class="form-label">Distance (m)</label>
+          <input class="form-control" type="number" name="exercises[{{ loop.index0 }}][distance_m]" value="{{ ex.distance_m or '' }}" placeholder="0"/>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;border-style:dashed;" onclick="addCircuitRow()">
+    + Add Exercise
+  </button>
+
+  {% elif tmpl.workout_type == 'hyrox' %}
+  <!-- Hyrox: custom station list -->
+  <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">Edit each station. Distance and reps are targets.</p>
+  <div id="stations-container">
+    {% set stations = parsed.get('stations', []) if parsed is mapping else [] %}
+    {% for s in stations %}
+    <div class="hyrox-station-row set-row card card-sm" style="margin-bottom:8px;position:relative;" data-idx="{{ loop.index0 }}">
+      <button type="button" onclick="removeStation(this)"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-right:30px;">Station {{ loop.index }}</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">Station Name</label>
+        <input class="form-control station-name" name="stations[{{ loop.index0 }}][name]"
+               value="{{ s.name }}" placeholder="e.g. 1km Run, SkiErg" oninput="updatePreview()"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div>
+          <label class="form-label">Distance (m)</label>
+          <input class="form-control station-distance" type="number" name="stations[{{ loop.index0 }}][distance_m]"
+                 value="{{ s.distance_m or '' }}" placeholder="e.g. 1000" oninput="updatePreview()"/>
+        </div>
+        <div>
+          <label class="form-label">Reps</label>
+          <input class="form-control station-reps" type="number" name="stations[{{ loop.index0 }}][reps]"
+                 value="{{ s.reps or '' }}" placeholder="e.g. 80" oninput="updatePreview()"/>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:10px;border-style:dashed;color:var(--hyrox);border-color:color-mix(in srgb,var(--hyrox) 40%,transparent);"
+          onclick="addStation()">+ Add Station</button>
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:0.05em;color:var(--muted);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border);">PREVIEW</div>
+  <div id="station-preview" class="card" style="margin-bottom:16px;min-height:44px;"></div>
+  {% endif %}
+
+  <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;">
+    Save Changes ✓
+  </button>
+</form>
+
+{% if tmpl.workout_type == 'hyrox' %}
+<script>
+  let stEditIdx = {{ (parsed.get('stations', []) if parsed is mapping else []) | length }};
+
+  function addStation(name='', distanceM='', reps='') {
+    const idx = stEditIdx++;
+    const html = `<div class="hyrox-station-row set-row card card-sm" style="margin-bottom:8px;position:relative;" data-idx="${idx}">
+      <button type="button" onclick="removeStation(this)"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-right:30px;">Station ${idx + 1}</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">Station Name</label>
+        <input class="form-control station-name" name="stations[${idx}][name]"
+               value="${name}" placeholder="e.g. 1km Run, SkiErg" oninput="updatePreview()"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label class="form-label">Distance (m)</label>
+          <input class="form-control station-distance" type="number" name="stations[${idx}][distance_m]"
+                 value="${distanceM}" placeholder="e.g. 1000" oninput="updatePreview()"/></div>
+        <div><label class="form-label">Reps</label>
+          <input class="form-control station-reps" type="number" name="stations[${idx}][reps]"
+                 value="${reps}" placeholder="e.g. 80" oninput="updatePreview()"/></div>
+      </div>
+    </div>`;
+    document.getElementById('stations-container').insertAdjacentHTML('beforeend', html);
+    updatePreview();
+  }
+
+  function removeStation(btn) {
+    btn.closest('.hyrox-station-row').remove();
+    updatePreview();
+  }
+
+  function updatePreview() {
+    const rows = document.querySelectorAll('.hyrox-station-row');
+    const preview = document.getElementById('station-preview');
+    if (!rows.length) {
+      preview.innerHTML = '<span style="color:var(--muted);font-size:13px;">No stations yet</span>';
+      return;
+    }
+    let html = '';
+    rows.forEach((row, i) => {
+      const name = row.querySelector('.station-name')?.value || '';
+      const dist = row.querySelector('.station-distance')?.value || '';
+      const reps = row.querySelector('.station-reps')?.value || '';
+      const isRun = name.toLowerCase().includes('run');
+      const color = isRun ? 'var(--run)' : 'var(--hyrox)';
+      let detail = '';
+      if (dist) detail += dist + 'm';
+      if (reps) detail += (detail ? ' · ' : '') + reps + ' reps';
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;${i < rows.length - 1 ? 'border-bottom:1px solid var(--border);' : ''}">
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${color};min-width:22px;">${i + 1}</span>
+        <span style="flex:1;font-size:14px;">${name || '<span style=\'color:var(--muted)\'>—</span>'}</span>
+        ${detail ? `<span style="font-size:11px;color:var(--muted);">${detail}</span>` : ''}
+      </div>`;
+    });
+    preview.innerHTML = html;
+  }
+
+  document.addEventListener('DOMContentLoaded', updatePreview);
+</script>
+{% endif %}
+
+{% if tmpl.workout_type in ('strength', 'circuit') %}
+<script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
+<script>
+  const exercises = [
+    {% for ex in exercises %}
+    { id: {{ ex.id }}, name: {{ ex.name | tojson }}, group: {{ (ex.muscle_group or '') | tojson }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  {% if tmpl.workout_type == 'strength' %}
+  let strEditIdx = {{ ex_lines | length }};
+
+  function addStrengthRow() {
+    const idx = strEditIdx++;
+    const row = document.createElement('div');
+    row.className = 'set-row card card-sm';
+    row.style.cssText = 'margin-bottom:8px;position:relative;';
+    row.innerHTML = `
+      <button type="button" onclick="this.closest('.set-row').remove()"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-right:30px;">Exercise ${idx + 1}</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">Exercise</label>
+        <div data-exercise-wrap>
+          <input type="text" class="form-control ex-search-input" placeholder="Search exercises..." autocomplete="off"/>
+          <input type="hidden" class="exercise-id-input" name="exercises[${idx}][exercise_id]" value=""/>
+          <input type="hidden" name="exercises[${idx}][exercise_name]" class="exercise-name-hidden" value=""/>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Sets &amp; Reps <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+        <input class="form-control" type="text" name="exercises[${idx}][sets_reps]" placeholder="e.g. 4x8-10"/>
+      </div>
+    `;
+    document.getElementById('edit-exercises-container').appendChild(row);
+    const inputEl = row.querySelector('.ex-search-input');
+    const hiddenEl = row.querySelector('.exercise-id-input');
+    const nameEl = row.querySelector('.exercise-name-hidden');
+    new ExerciseSearch(inputEl, exercises, {
+      hiddenInputEl: hiddenEl,
+      onSelect(ex) { nameEl.value = ex ? ex.name : ''; }
+    });
+    inputEl.addEventListener('blur', () => { if (!hiddenEl.value) nameEl.value = inputEl.value.trim(); });
+  }
+  {% endif %}
+
+  {% if tmpl.workout_type == 'circuit' %}
+  let circEditIdx = {{ parsed.get('exercises', []) | length }};
+
+  function addCircuitRow() {
+    const idx = circEditIdx++;
+    const row = document.createElement('div');
+    row.className = 'set-row card card-sm';
+    row.style.cssText = 'margin-bottom:8px;position:relative;';
+    row.innerHTML = `
+      <button type="button" onclick="this.closest('.set-row').remove()"
+        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Exercise ${idx + 1}</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">Exercise</label>
+        <div data-exercise-wrap>
+          <input type="text" class="form-control ex-search-input" placeholder="Search exercises..." autocomplete="off"/>
+          <input type="hidden" class="exercise-id-input" name="exercises[${idx}][exercise_id]" value=""/>
+          <input type="hidden" name="exercises[${idx}][name]" class="exercise-name-hidden" value=""/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div><label class="form-label">Reps</label>
+          <input class="form-control" type="number" name="exercises[${idx}][reps]" placeholder="10"/></div>
+        <div><label class="form-label">Weight (lbs)</label>
+          <input class="form-control" type="number" step="0.5" name="exercises[${idx}][weight_lbs]" placeholder="0"/></div>
+        <div><label class="form-label">Distance (m)</label>
+          <input class="form-control" type="number" name="exercises[${idx}][distance_m]" placeholder="0"/></div>
+      </div>
+    `;
+    document.getElementById('circuit-exercises-container').appendChild(row);
+    const inputEl = row.querySelector('.ex-search-input');
+    const hiddenEl = row.querySelector('.exercise-id-input');
+    const nameEl = row.querySelector('.exercise-name-hidden');
+    new ExerciseSearch(inputEl, exercises, {
+      hiddenInputEl: hiddenEl,
+      onSelect(ex) { nameEl.value = ex ? ex.name : ''; }
+    });
+    inputEl.addEventListener('blur', () => { if (!hiddenEl.value) nameEl.value = inputEl.value.trim(); });
+  }
+  {% endif %}
+
+  // Init all pre-rendered exercise search inputs
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-exercise-wrap] .ex-search-input:not([data-es-init])').forEach(el => {
+      const hiddenEl = el.nextElementSibling;
+      const nameEl   = el.closest('[data-exercise-wrap]').querySelector('.exercise-name-hidden');
+      new ExerciseSearch(el, exercises, {
+        hiddenInputEl: hiddenEl,
+        onSelect(ex) { if (nameEl) nameEl.value = ex ? ex.name : ''; }
+      });
+      el.addEventListener('blur', () => { if (nameEl && !hiddenEl.value) nameEl.value = el.value.trim(); });
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for
 from datetime import date
-from ..models import db, WorkoutPlan, PlanDay
+from ..models import db, WorkoutPlan, PlanDay, WorkoutTemplate
+import json
 
 plans_bp = Blueprint('plans', __name__)
 
@@ -26,7 +27,15 @@ def index():
         p.progress_pct   = int(done / total * 100) if total > 0 else 0
         p.comp_week      = _completion_week(p.id)
 
-    return render_template('plans/index.html', plans=plans, programs=programs, today=date.today())
+    templates = WorkoutTemplate.query.order_by(WorkoutTemplate.created_at.desc()).all()
+    for tmpl in templates:
+        try:
+            tmpl._parsed = json.loads(tmpl.template_data) if tmpl.template_data else {}
+        except Exception:
+            tmpl._parsed = {}
+
+    return render_template('plans/index.html', plans=plans, programs=programs,
+                           templates=templates, today=date.today())
 
 
 @plans_bp.route('/new', methods=['GET', 'POST'])

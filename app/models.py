@@ -382,3 +382,14 @@ class PremadeStationResult(db.Model):
     notes             = db.Column(db.Text)
     skipped           = db.Column(db.Boolean, default=False)
     station           = db.relationship('PremadeStation')
+
+
+class WorkoutTemplate(db.Model):
+    __tablename__ = 'workout_templates'
+    id            = db.Column(db.Integer, primary_key=True)
+    name          = db.Column(db.String(150), nullable=False)
+    description   = db.Column(db.Text)
+    workout_type  = db.Column(db.String(20), nullable=False, default='strength')
+    source        = db.Column(db.String(200))
+    template_data = db.Column(db.Text)
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
