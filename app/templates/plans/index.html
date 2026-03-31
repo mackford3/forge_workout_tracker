@@ -152,7 +152,7 @@
           <div style="display:flex;align-items:baseline;gap:8px;padding:3px 0;font-size:13px;">
             <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--accent);min-width:20px;">{{ loop.index }}</span>
             {% if ex is mapping %}
-              <span>{{ ex.exercise_name }}{% if ex.sets_reps %} <span style="font-size:11px;color:var(--muted);">{{ ex.sets_reps }}</span>{% endif %}</span>
+              <span>{{ ex.exercise_name }}{% if ex.get('sets') %} <span style="font-size:11px;color:var(--muted);">{% for s in ex.sets %}{% if s.get('reps') %}{{ s.reps }}{% if not loop.last %} / {% endif %}{% endif %}{% endfor %} reps</span>{% elif ex.get('sets_reps') %} <span style="font-size:11px;color:var(--muted);">{{ ex.sets_reps }}</span>{% endif %}</span>
             {% else %}
               <span>{{ ex }}</span>
             {% endif %}
@@ -169,7 +169,7 @@
             <span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--circuit);min-width:20px;">{{ loop.index }}</span>
             <span style="flex:1;">{{ ex.name }}</span>
             <span style="font-size:11px;color:var(--muted);">
-              {% if ex.reps %}{{ ex.reps }} reps{% endif %}
+              {% if ex.get('sets') %}{% for s in ex.sets %}{% if s.get('reps') %}{{ s.reps }}{% if not loop.last %} / {% endif %}{% endif %}{% endfor %} reps{% elif ex.get('reps') %}{{ ex.reps }} reps{% endif %}
               {% if ex.weight_lbs %} · {{ ex.weight_lbs | int }} lbs{% endif %}
               {% if ex.distance_m %} · {{ ex.distance_m }}m{% endif %}
             </span>

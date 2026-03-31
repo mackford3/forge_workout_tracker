@@ -61,12 +61,22 @@ def new_strength():
         while f.get(f'exercises[{i}][exercise_name]') is not None or f.get(f'exercises[{i}][exercise_id]') is not None:
             ex_name = f.get(f'exercises[{i}][exercise_name]', '').strip()
             ex_id   = f.get(f'exercises[{i}][exercise_id]', '').strip()
-            sets_r  = f.get(f'exercises[{i}][sets_reps]', '').strip() or None
+            sets_list = []
+            j = 0
+            while (f.get(f'exercises[{i}][sets][{j}][reps]') is not None or
+                   f.get(f'exercises[{i}][sets][{j}][distance_m]') is not None):
+                reps_val = f.get(f'exercises[{i}][sets][{j}][reps]', '').strip()
+                dist_val = f.get(f'exercises[{i}][sets][{j}][distance_m]', '').strip()
+                sets_list.append({
+                    'reps': int(reps_val) if reps_val.isdigit() else None,
+                    'distance_m': int(dist_val) if dist_val.isdigit() else None,
+                })
+                j += 1
             if ex_name:
                 exercises_out.append({
                     'exercise_id':   int(ex_id) if ex_id.isdigit() else None,
                     'exercise_name': ex_name,
-                    'sets_reps':     sets_r,
+                    'sets':          sets_list or None,
                 })
             i += 1
         focus = f.get('focus', '').strip() or None
@@ -96,9 +106,20 @@ def new_circuit():
         while f.get(f'exercises[{i}][name]') is not None:
             name = f.get(f'exercises[{i}][name]', '').strip()
             if name:
+                sets_list = []
+                j = 0
+                while (f.get(f'exercises[{i}][sets][{j}][reps]') is not None or
+                   f.get(f'exercises[{i}][sets][{j}][distance_m]') is not None):
+                    reps_val = f.get(f'exercises[{i}][sets][{j}][reps]', '').strip()
+                    dist_val = f.get(f'exercises[{i}][sets][{j}][distance_m]', '').strip()
+                    sets_list.append({
+                        'reps': int(reps_val) if reps_val.isdigit() else None,
+                        'distance_m': int(dist_val) if dist_val.isdigit() else None,
+                    })
+                    j += 1
                 exercises.append({
                     'name': name,
-                    'reps': int(f.get(f'exercises[{i}][reps]', 0) or 0),
+                    'sets': sets_list or None,
                     'weight_lbs': float(f.get(f'exercises[{i}][weight_lbs]', 0) or 0) or None,
                     'distance_m': int(f.get(f'exercises[{i}][distance_m]', 0) or 0) or None,
                     'notes': f.get(f'exercises[{i}][notes]', '').strip() or None,
@@ -177,12 +198,22 @@ def edit(tmpl_id):
             while f.get(f'exercises[{i}][exercise_name]') is not None or f.get(f'exercises[{i}][exercise_id]') is not None:
                 ex_name = f.get(f'exercises[{i}][exercise_name]', '').strip()
                 ex_id   = f.get(f'exercises[{i}][exercise_id]', '').strip()
-                sets_r  = f.get(f'exercises[{i}][sets_reps]', '').strip() or None
+                sets_list = []
+                j = 0
+                while (f.get(f'exercises[{i}][sets][{j}][reps]') is not None or
+                   f.get(f'exercises[{i}][sets][{j}][distance_m]') is not None):
+                    reps_val = f.get(f'exercises[{i}][sets][{j}][reps]', '').strip()
+                    dist_val = f.get(f'exercises[{i}][sets][{j}][distance_m]', '').strip()
+                    sets_list.append({
+                        'reps': int(reps_val) if reps_val.isdigit() else None,
+                        'distance_m': int(dist_val) if dist_val.isdigit() else None,
+                    })
+                    j += 1
                 if ex_name:
                     exercises_out.append({
                         'exercise_id':   int(ex_id) if ex_id.isdigit() else None,
                         'exercise_name': ex_name,
-                        'sets_reps':     sets_r,
+                        'sets':          sets_list or None,
                     })
                 i += 1
             focus = f.get('focus', '').strip() or None
@@ -194,9 +225,20 @@ def edit(tmpl_id):
             while f.get(f'exercises[{i}][name]') is not None:
                 name = f.get(f'exercises[{i}][name]', '').strip()
                 if name:
+                    sets_list = []
+                    j = 0
+                    while (f.get(f'exercises[{i}][sets][{j}][reps]') is not None or
+                   f.get(f'exercises[{i}][sets][{j}][distance_m]') is not None):
+                        reps_val = f.get(f'exercises[{i}][sets][{j}][reps]', '').strip()
+                        dist_val = f.get(f'exercises[{i}][sets][{j}][distance_m]', '').strip()
+                        sets_list.append({
+                            'reps': int(reps_val) if reps_val.isdigit() else None,
+                            'distance_m': int(dist_val) if dist_val.isdigit() else None,
+                        })
+                        j += 1
                     exercises.append({
                         'name': name,
-                        'reps': int(f.get(f'exercises[{i}][reps]', 0) or 0),
+                        'sets': sets_list or None,
                         'weight_lbs': float(f.get(f'exercises[{i}][weight_lbs]', 0) or 0) or None,
                         'distance_m': int(f.get(f'exercises[{i}][distance_m]', 0) or 0) or None,
                         'notes': f.get(f'exercises[{i}][notes]', '').strip() or None,
@@ -284,11 +326,18 @@ def start(tmpl_id):
 
     elif tmpl.workout_type == 'circuit':
         exercises = data.get('exercises', []) if isinstance(data, dict) else []
+        rounds_target = data.get('rounds_target') if isinstance(data, dict) else None
         matched = []
         for ex in exercises:
             cleaned = clean_exercise_name(ex.get('name', ''))
             found = fuzzy_match(cleaned, ex_map)
-            matched.append({'raw': ex, 'exercise': found})
+            ex_sets = ex.get('sets') or []
+            # If rounds_target is set and only 1 set defined, replicate to fill all rounds
+            if rounds_target and len(ex_sets) == 1:
+                ex_sets = ex_sets * int(rounds_target)
+            elif rounds_target and not ex_sets:
+                ex_sets = [{}] * int(rounds_target)
+            matched.append({'raw': ex, 'exercise': found, 'sets': ex_sets})
         return render_template('workout_templates/start_circuit.html',
                                tmpl=tmpl, data=data, matched=matched,
                                all_exercises=all_exercises,

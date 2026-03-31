@@ -429,13 +429,17 @@
   {% endfor %}
 
 <!-- ── CIRCUIT / AMRAP ── -->
-{% elif wtype in ('circuit', 'amrap') %}
+{% elif wtype in ('circuit', 'amrap', 'emom', 'fortime') %}
   {% for c in workout.circuits.all() %}
   <div class="card" style="margin-bottom:10px;">
     <div class="stat-grid" style="margin-bottom:12px;">
       <div class="stat-box">
         <div class="stat-val" style="color:{{ 'var(--amrap)' if wtype=='amrap' else 'var(--circuit)' }};">
-          {{ c.rounds_completed or '—' }}{% if c.rounds_target %}/{{ c.rounds_target }}{% endif %}
+          {% if wtype == 'fortime' %}
+            {{ c.rounds_completed|int if c.rounds_completed else (c.rounds_target or '—') }}
+          {% else %}
+            {{ c.rounds_completed or '—' }}{% if c.rounds_target %}/{{ c.rounds_target }}{% endif %}
+          {% endif %}
         </div>
         <div class="stat-label">Rounds</div>
       </div>
@@ -445,7 +449,14 @@
           {% elif c.time_cap_s %}{{ c.time_cap_s//60 }} min cap
           {% else %}—{% endif %}
         </div>
-        <div class="stat-label">Time</div>
+        <div class="stat-label">
+          {% if wtype == 'fortime' and c.total_time_s and c.time_cap_s %}
+            {% set diff = (c.total_time_s | int) - (c.time_cap_s | int) %}
+            {% if diff > 0 %}<span style="color:#ff9800;">+{{ diff//60 }}:{{ "%02d"|format(diff%60) }} over cap</span>
+            {% elif diff < 0 %}<span style="color:var(--accent);">{{ (-diff)//60 }}:{{ "%02d"|format((-diff)%60) }} under cap</span>
+            {% else %}Time{% endif %}
+          {% else %}Time{% endif %}
+        </div>
       </div>
     </div>
 
@@ -459,7 +470,7 @@
         <span style="font-size:14px;font-weight:600;">{{ ce.exercise.name }}</span>
         <span style="font-size:11px;color:var(--muted);margin-left:auto;">
           {% if ce.target_reps %}target: {{ ce.target_reps }} reps{% endif %}
-          {% if ce.target_weight_lbs and weight_unit == 'lbs' %} @ {{ ce.target_weight_lbs|float|int }}lbs{% endif %}
+          {% if ce.target_weight_lbs %} @ {{ ce.target_weight_lbs|float|int }}lbs{% endif %}
           {% if ce.target_distance_m %}{{ ce.target_distance_m }}m{% endif %}
         </span>
       </div>
@@ -475,10 +486,15 @@
             <div style="color:var(--run);font-weight:600;">{{ (rs.duration_s | int)//60 }}:{{ "%02d"|format((rs.duration_s | int)%60) }}</div>
           {% endif %}
           {% if rs.reps %}
-            <div style="color:var(--accent);font-weight:600;">{{ rs.reps }}{% if rs.weight_lbs %}<span style="font-size:10px;color:var(--muted);">×{{ rs.weight_lbs|float|int }}</span>{% endif %}</div>
+            <div style="color:var(--accent);font-weight:600;">{{ rs.reps }}</div>
           {% endif %}
           {% if rs.distance_m %}
             <div style="color:var(--muted);font-size:11px;">{{ rs.distance_m|float|int }}m</div>
+          {% endif %}
+          {% if rs.weight_lbs %}
+            <div style="font-size:10px;color:var(--muted);">{{ rs.weight_lbs|float|int }}lbs</div>
+          {% elif ce.target_weight_lbs %}
+            <div style="font-size:10px;color:var(--muted);">{{ ce.target_weight_lbs|float|int }}lbs</div>
           {% endif %}
           {% if rs.steps %}
             <div style="color:var(--accent);font-weight:600;">{{ rs.steps }}

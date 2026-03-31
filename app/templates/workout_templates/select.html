@@ -172,10 +172,10 @@
           <span class="ex-meta">
             {% if item is mapping %}
               {% if wtype == 'strength' %}
-                {{ item.get('sets_reps') or '' }}
+                {% if item.get('sets') %}{% for s in item.sets %}{% if s.get('reps') %}{{ s.reps }}{% if not loop.last %} / {% endif %}{% endif %}{% endfor %} reps{% elif item.get('sets_reps') %}{{ item.sets_reps }}{% endif %}
               {% elif wtype == 'circuit' %}
                 {% set parts = [] %}
-                {% if item.get('reps') %}{% set _ = parts.append(item.reps ~ ' reps') %}{% endif %}
+                {% if item.get('sets') %}{% set _ = parts.append(item.sets | length ~ ' rounds') %}{% elif item.get('reps') %}{% set _ = parts.append(item.reps ~ ' reps') %}{% endif %}
                 {% if item.get('weight_lbs') %}{% set _ = parts.append((item.weight_lbs | int) ~ ' lbs') %}{% endif %}
                 {% if item.get('distance_m') %}{% set _ = parts.append(item.distance_m ~ 'm') %}{% endif %}
                 {{ parts | join(' · ') }}

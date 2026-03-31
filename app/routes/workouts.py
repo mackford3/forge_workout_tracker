@@ -88,7 +88,8 @@ def view(workout_id):
         pass
 
     return render_template('workouts/view.html', workout=workout, pr_map=pr_map,
-                           pr_best=pr_best, premade_result=premade_result)
+                           pr_best=pr_best, premade_result=premade_result,
+                           weight_unit=session.get('weight_unit', 'lbs'))
 
 
 # ── Delete ─────────────────────────────────────────────────
@@ -604,26 +605,61 @@ def log_circuit():
         db.session.add(circuit)
         db.session.flush()
 
+        # Parse For Time round splits (MM:SS → seconds)
+        splits = []
+        k = 0
+        while f.get(f'round_splits[{k}]') is not None:
+            splits.append(_time_to_seconds(f.get(f'round_splits[{k}]')))
+            k += 1
+        if splits:
+            circuit.round_splits = splits
+
         i = 0
         while f.get(f'exercises[{i}][exercise_id]'):
-            weight_raw = float(f[f'exercises[{i}][weight]']) if f.get(f'exercises[{i}][weight]') else None
-            unit = f.get(f'exercises[{i}][unit]', 'lbs')
-            weight_kg = weight_lbs = None
-            if weight_raw:
-                if unit == 'lbs':
-                    weight_lbs = weight_raw; weight_kg = lbs_to_kg(weight_raw)
-                else:
-                    weight_kg = weight_raw; weight_lbs = weight_raw * 2.20462
+            # Derive target reps/distance from first round
+            first_reps = int(f[f'exercises[{i}][rounds][0][reps]']) if f.get(f'exercises[{i}][rounds][0][reps]') else None
+            first_dist = int(f[f'exercises[{i}][rounds][0][distance_m]']) if f.get(f'exercises[{i}][rounds][0][distance_m]') else None
+            # Fall back to flat fields for manual (non-template) log forms
+            target_reps = first_reps if first_reps is not None else (int(f[f'exercises[{i}][reps]']) if f.get(f'exercises[{i}][reps]') else None)
+            target_dist = first_dist if first_dist is not None else (int(f[f'exercises[{i}][distance_m]']) if f.get(f'exercises[{i}][distance_m]') else None)
+
+            # Derive target weight from first round's weight field
+            first_wt_raw = f.get(f'exercises[{i}][rounds][0][weight]', '').strip()
+            target_wt_lbs = float(first_wt_raw) if first_wt_raw else None
+
             ce = CircuitExercise(
                 circuit_id        = circuit.id,
                 exercise_id       = int(f[f'exercises[{i}][exercise_id]']),
                 order_index       = i,
-                target_reps       = int(f[f'exercises[{i}][reps]']) if f.get(f'exercises[{i}][reps]') else None,
-                target_weight_lbs = weight_lbs,
-                target_distance_m = int(f[f'exercises[{i}][distance_m]']) if f.get(f'exercises[{i}][distance_m]') else None,
+                target_reps       = target_reps,
+                target_weight_lbs = target_wt_lbs,
+                target_distance_m = target_dist,
                 notes             = f.get(f'exercises[{i}][notes]'),
             )
             db.session.add(ce)
+            db.session.flush()
+
+            # Create per-round sets with reps/distance and weight
+            j = 0
+            while f.get(f'exercises[{i}][rounds][{j}][reps]') is not None or f.get(f'exercises[{i}][rounds][{j}][distance_m]') is not None:
+                reps_val = f.get(f'exercises[{i}][rounds][{j}][reps]', '').strip()
+                dist_val = f.get(f'exercises[{i}][rounds][{j}][distance_m]', '').strip()
+                wt_raw = f.get(f'exercises[{i}][rounds][{j}][weight]', '').strip()
+                wt_lbs = wt_kg = None
+                if wt_raw:
+                    wt_lbs = float(wt_raw)
+                    wt_kg  = lbs_to_kg(wt_lbs)
+                rs = CircuitRoundSet(
+                    circuit_exercise_id = ce.id,
+                    round_number        = j + 1,
+                    reps                = int(reps_val) if reps_val.isdigit() else None,
+                    distance_m          = float(dist_val) if dist_val else None,
+                    weight_lbs          = wt_lbs,
+                    weight_kg           = wt_kg,
+                )
+                db.session.add(rs)
+                j += 1
+
             i += 1
 
         db.session.commit()

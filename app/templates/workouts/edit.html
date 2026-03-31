@@ -222,9 +222,9 @@
   </div>
 
   <!-- ══════════════════════════════════════════
-       CIRCUIT / AMRAP
+       CIRCUIT / AMRAP / EMOM / FOR TIME
   ══════════════════════════════════════════ -->
-  {% elif wtype in ('circuit', 'amrap') %}
+  {% elif wtype in ('circuit', 'amrap', 'emom', 'fortime') %}
   {% set c = workout.circuits.first() %}
   {% if c %}
   <div class="card" style="margin-bottom:10px;">

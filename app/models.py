@@ -233,6 +233,7 @@ class Circuit(db.Model):
     rounds_completed = db.Column(db.Numeric(4, 1))
     time_cap_s       = db.Column(db.Integer)
     total_time_s     = db.Column(db.Integer)
+    round_splits     = db.Column(db.JSON)
     notes            = db.Column(db.Text)
     exercises        = db.relationship('CircuitExercise', backref='circuit', lazy='dynamic',
                                        order_by='CircuitExercise.order_index', cascade='all, delete-orphan')
