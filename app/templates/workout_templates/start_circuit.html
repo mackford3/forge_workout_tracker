@@ -95,7 +95,32 @@
       <label class="form-label">Date & Time</label>
       <input class="form-control" type="datetime-local" name="completed_at"/>
     </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <div class="form-group">
+        <label class="form-label">Duration (min)</label>
+        <input class="form-control" type="number" name="duration_minutes" placeholder="45"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Calories</label>
+        <input class="form-control" type="number" name="calories" placeholder="—"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Avg BPM</label>
+        <input class="form-control" type="number" name="avg_bpm" placeholder="—"/>
+      </div>
+    </div>
   </div>
+
+  {% if ct == 'fortime' %}
+  <div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <h2 style="font-size:14px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:0;">Round Splits</h2>
+      <button type="button" onclick="addSplit()"
+        style="background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;">+ Add Split</button>
+    </div>
+    <div id="split-container"></div>
+  </div>
+  {% endif %}
 
   <div class="section-header" style="margin-top:8px;">
     <h2>EXERCISES</h2>
@@ -112,16 +137,19 @@
     {% for m in matched %}
     {% set ex = m.raw %}
     {% set found = m.exercise %}
-    <div class="set-row card card-sm" style="margin-bottom:8px;position:relative;{% if not found %}border-color:#ff9800;{% endif %}">
-      <button type="button" onclick="this.closest('.set-row').remove()"
+    {% set ex_sets = m.sets %}
+    {% set ei = loop.index0 %}
+    <div class="set-row card card-sm circuit-ex-card" style="margin-bottom:8px;position:relative;{% if not found %}border-color:#ff9800;{% endif %}"
+         data-ex-idx="{{ ei }}" data-default-weight="{{ ex.weight_lbs or '' }}" data-default-unit="{{ weight_unit }}">
+      <button type="button" onclick="this.closest('.circuit-ex-card').remove()"
         style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
       <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">
         Exercise {{ loop.index }}
         {% if not found %}<span style="color:#ff9800;margin-left:6px;">⚠ not found — select manually</span>{% endif %}
       </div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:8px;">
         <label class="form-label">Exercise</label>
-        <select class="form-control" name="exercises[{{ loop.index0 }}][exercise_id]" required>
+        <select class="form-control" name="exercises[{{ ei }}][exercise_id]" required>
           <option value="">Select exercise...</option>
           {% set cur_group = namespace(val=None) %}
           {% for e in all_exercises %}
@@ -135,36 +163,63 @@
           {% if cur_group.val is not none %}</optgroup>{% endif %}
         </select>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-        <div>
-          <label class="form-label">Reps</label>
-          <input class="form-control" type="number" name="exercises[{{ loop.index0 }}][reps]"
-                 value="{{ ex.reps or '' }}" placeholder="10"/>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label class="form-label" style="margin:0;font-size:11px;">ROUNDS</label>
+          <button type="button" onclick="addLogRound({{ ei }})"
+            style="background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;">+ Add Round</button>
         </div>
-        <div>
-          <label class="form-label">Weight</label>
-          <input class="form-control" type="number" step="0.5" name="exercises[{{ loop.index0 }}][weight]"
-                 value="{{ ex.weight_lbs or '' }}" placeholder="0"/>
-        </div>
-        <div>
-          <label class="form-label">Unit</label>
-          <select class="form-control unit-select" name="exercises[{{ loop.index0 }}][unit]">
-            <option value="lbs" {{ 'selected' if weight_unit=='lbs' }}>lbs</option>
-            <option value="kg"  {{ 'selected' if weight_unit=='kg' }}>kg</option>
-          </select>
+        <div class="log-rounds-container" id="log-rounds-{{ ei }}" data-field-group="rounds">
+          {% for s in ex_sets %}
+            {% if s.get('distance_m') %}{% set rt = 'distance_m' %}{% set rv = s.distance_m %}{% else %}{% set rt = 'reps' %}{% set rv = s.get('reps', '') or '' %}{% endif %}
+          <div class="log-round-entry" style="margin-bottom:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <span class="round-label" style="font-size:11px;color:var(--muted);">Round {{ loop.index }}</span>
+              {% if rv %}<span style="font-size:10px;color:var(--muted);font-style:italic;">target: {{ rv }}{{ ' reps' if rt == 'reps' else 'm' }}</span>{% endif %}
+              <button type="button" onclick="removeLogRound(this)"
+                style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0;">✕</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+              <select class="form-control round-type" onchange="updateRoundType(this)"
+                      style="padding:8px;font-size:13px;">
+                <option value="reps" {{ 'selected' if rt == 'reps' }}>Reps</option>
+                <option value="distance_m" {{ 'selected' if rt == 'distance_m' }}>Dist (m)</option>
+              </select>
+              <input class="form-control round-val" type="number" name="exercises[{{ ei }}][rounds][{{ loop.index0 }}][{{ rt }}]"
+                     placeholder="{{ rv if rv else ('Reps' if rt == 'reps' else 'Dist') }}" min="1" value=""/>
+              <input class="form-control round-weight" type="number" step="0.5"
+                     name="exercises[{{ ei }}][rounds][{{ loop.index0 }}][weight]"
+                     placeholder="{{ ex.weight_lbs or 'lbs' }}" style="{% if rt == 'distance_m' %}display:none;{% endif %}"/>
+            </div>
+          </div>
+          {% endfor %}
+          {% if not ex_sets %}
+          <div class="log-round-entry" style="margin-bottom:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+              <span class="round-label" style="font-size:11px;color:var(--muted);">Round 1</span>
+              <button type="button" onclick="removeLogRound(this)"
+                style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0;">✕</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+              <select class="form-control round-type" onchange="updateRoundType(this)"
+                      style="padding:8px;font-size:13px;">
+                <option value="reps">Reps</option>
+                <option value="distance_m">Dist (m)</option>
+              </select>
+              <input class="form-control round-val" type="number" name="exercises[{{ ei }}][rounds][0][reps]"
+                     placeholder="Reps" min="1" value=""/>
+              <input class="form-control round-weight" type="number" step="0.5"
+                     name="exercises[{{ ei }}][rounds][0][weight]"
+                     placeholder="{{ ex.weight_lbs or 'lbs' }}"/>
+            </div>
+          </div>
+          {% endif %}
         </div>
       </div>
-      {% if ex.distance_m %}
-      <div style="margin-top:8px;">
-        <label class="form-label">Distance (m)</label>
-        <input class="form-control" type="number" name="exercises[{{ loop.index0 }}][distance_m]"
-               value="{{ ex.distance_m }}"/>
-      </div>
-      {% endif %}
       {% if ex.notes %}
       <div style="margin-top:8px;">
         <label class="form-label">Notes</label>
-        <input class="form-control" name="exercises[{{ loop.index0 }}][notes]" value="{{ ex.notes }}"/>
+        <input class="form-control" name="exercises[{{ ei }}][notes]" value="{{ ex.notes }}"/>
       </div>
       {% endif %}
     </div>
@@ -208,32 +263,134 @@
     return html;
   }
 
+  function updateRoundType(sel) {
+    const entry = sel.closest('.log-round-entry, .round-entry');
+    const container = entry.parentElement;
+    const group = container.dataset.fieldGroup || 'rounds';
+    const card = entry.closest('[data-ex-idx]');
+    const exIdx = parseInt(card.dataset.exIdx);
+    const roundIdx = Array.from(container.children).indexOf(entry);
+    const input = entry.querySelector('.round-val');
+    input.name = `exercises[${exIdx}][${group}][${roundIdx}][${sel.value}]`;
+    input.placeholder = sel.value === 'reps' ? 'Reps' : 'Dist (m)';
+    input.value = '';
+    const wtInput = entry.querySelector('.round-weight');
+    if (wtInput) wtInput.style.display = sel.value === 'distance_m' ? 'none' : '';
+  }
+
+  function addLogRound(eiIdx) {
+    const container = document.getElementById(`log-rounds-${eiIdx}`);
+    const roundIdx = container.children.length;
+    const group = container.dataset.fieldGroup || 'rounds';
+    const card = container.closest('[data-ex-idx]');
+    const defWt = card ? (card.dataset.defaultWeight || '') : '';
+    const defUnit = card ? (card.dataset.defaultUnit || 'lbs') : 'lbs';
+    const div = document.createElement('div');
+    div.className = 'log-round-entry';
+    div.style.marginBottom = '8px';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <span class="round-label" style="font-size:11px;color:var(--muted);">Round ${roundIdx + 1}</span>
+        <button type="button" onclick="removeLogRound(this)"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0;">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+        <select class="form-control round-type" onchange="updateRoundType(this)"
+                style="padding:8px;font-size:13px;">
+          <option value="reps">Reps</option>
+          <option value="distance_m">Dist (m)</option>
+        </select>
+        <input class="form-control round-val" type="number"
+               name="exercises[${eiIdx}][${group}][${roundIdx}][reps]"
+               placeholder="Reps" min="1"/>
+        <input class="form-control round-weight" type="number" step="0.5"
+               name="exercises[${eiIdx}][${group}][${roundIdx}][weight]"
+               value="${defWt}" placeholder="lbs"/>
+      </div>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeLogRound(btn) {
+    const entry = btn.closest('.log-round-entry');
+    const container = entry.parentElement;
+    const group = container.dataset.fieldGroup || 'rounds';
+    const exIdx = parseInt(entry.closest('[data-ex-idx]').dataset.exIdx);
+    entry.remove();
+    Array.from(container.children).forEach((row, i) => {
+      row.querySelector('.round-label').textContent = `Round ${i + 1}`;
+      const sel = row.querySelector('.round-type');
+      row.querySelector('.round-val').name = `exercises[${exIdx}][${group}][${i}][${sel.value}]`;
+      const wt = row.querySelector('.round-weight');
+      if (wt) wt.name = `exercises[${exIdx}][${group}][${i}][weight]`;
+    });
+  }
+
   function addExercise() {
     const unit = document.getElementById('global-unit').value;
     const idx  = exIdx++;
-    const row  = `<div class="set-row card card-sm" style="margin-bottom:8px;position:relative;">
-      <button type="button" onclick="this.closest('.set-row').remove()"
+    const row  = document.createElement('div');
+    row.className = 'set-row card card-sm circuit-ex-card';
+    row.style.cssText = 'margin-bottom:8px;position:relative;';
+    row.dataset.exIdx = idx;
+    row.dataset.defaultWeight = '';
+    row.dataset.defaultUnit = unit;
+    row.innerHTML = `
+      <button type="button" onclick="this.closest('.circuit-ex-card').remove()"
         style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
       <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Exercise ${idx + 1}</div>
-      <div class="form-group">
+      <div class="form-group" style="margin-bottom:8px;">
         <label class="form-label">Exercise</label>
         <select class="form-control" name="exercises[${idx}][exercise_id]" required>${buildOptions()}</select>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-        <div><label class="form-label">Reps</label>
-          <input class="form-control" type="number" name="exercises[${idx}][reps]" placeholder="10"/></div>
-        <div><label class="form-label">Weight</label>
-          <input class="form-control" type="number" step="0.5" name="exercises[${idx}][weight]" placeholder="0"/></div>
-        <div><label class="form-label">Unit</label>
-          <select class="form-control unit-select" name="exercises[${idx}][unit]">
-            <option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>lbs</option>
-            <option value="kg"  ${unit === 'kg'  ? 'selected' : ''}>kg</option>
-          </select></div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label class="form-label" style="margin:0;font-size:11px;">ROUNDS</label>
+          <button type="button" onclick="addLogRound(${idx})"
+            style="background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;">+ Add Round</button>
+        </div>
+        <div class="log-rounds-container" id="log-rounds-${idx}" data-field-group="rounds"></div>
       </div>
-    </div>`;
-    document.getElementById('circuit-exercises-container').insertAdjacentHTML('beforeend', row);
+    `;
+    document.getElementById('circuit-exercises-container').appendChild(row);
+    addLogRound(idx);
   }
 
   function setUnit(unit) { document.querySelectorAll('.unit-select').forEach(s => s.value = unit); }
+
+  {% if ct == 'fortime' %}
+  function addSplit() {
+    const container = document.getElementById('split-container');
+    const idx = container.children.length;
+    const div = document.createElement('div');
+    div.className = 'split-entry';
+    div.style.marginBottom = '6px';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="split-label" style="font-size:11px;color:var(--muted);width:52px;flex-shrink:0;">Round ${idx + 1}</span>
+        <input class="form-control" type="text" name="round_splits[${idx}]" placeholder="MM:SS"
+               style="flex:1;max-width:110px;"/>
+        <button type="button" onclick="removeSplit(this)"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0;">✕</button>
+      </div>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeSplit(btn) {
+    const entry = btn.closest('.split-entry');
+    const container = entry.parentElement;
+    entry.remove();
+    Array.from(container.children).forEach((row, i) => {
+      row.querySelector('.split-label').textContent = `Round ${i + 1}`;
+      row.querySelector('input[type="text"]').name = `round_splits[${i}]`;
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const rounds = {{ data.get('rounds_target', 0) or 0 }};
+    for (let i = 0; i < rounds; i++) addSplit();
+  });
+  {% endif %}
 </script>
 {% endblock %}

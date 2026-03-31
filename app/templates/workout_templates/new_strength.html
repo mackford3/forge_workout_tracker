@@ -71,10 +71,11 @@
   function addExRow(prefill = {}) {
     const idx = exRowIdx++;
     const row = document.createElement('div');
-    row.className = 'set-row card card-sm';
+    row.className = 'set-row card card-sm exercise-card';
     row.style.cssText = 'margin-bottom:8px;position:relative;';
+    row.dataset.exIdx = idx;
     row.innerHTML = `
-      <button type="button" onclick="this.closest('.set-row').remove()"
+      <button type="button" onclick="this.closest('.exercise-card').remove()"
         style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
       <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-right:30px;">Exercise ${idx + 1}</div>
       <div class="form-group" style="margin-bottom:8px;">
@@ -91,9 +92,12 @@
         </div>
       </div>
       <div>
-        <label class="form-label">Sets &amp; Reps <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
-        <input class="form-control" type="text" name="exercises[${idx}][sets_reps]"
-               placeholder="e.g. 4x8-10" value="${(prefill.sets_reps || '').replace(/"/g,'&quot;')}"/>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label class="form-label" style="margin:0;">Sets</label>
+          <button type="button" onclick="addSetRow(${idx})"
+            style="background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;">+ Add Set</button>
+        </div>
+        <div class="sets-container" id="sets-${idx}"></div>
       </div>
     `;
     document.getElementById('exercises-container').appendChild(row);
@@ -104,14 +108,44 @@
 
     new ExerciseSearch(inputEl, exercises, {
       hiddenInputEl: hiddenEl,
-      onSelect(ex) {
-        nameEl.value = ex ? ex.name : '';
-      }
+      onSelect(ex) { nameEl.value = ex ? ex.name : ''; }
     });
 
-    // Sync name hidden field on blur too (in case user typed without selecting)
     inputEl.addEventListener('blur', () => {
       if (!hiddenEl.value) nameEl.value = inputEl.value.trim();
+    });
+
+    if (prefill.sets && prefill.sets.length) {
+      prefill.sets.forEach(s => addSetRow(idx, s.reps));
+    } else {
+      addSetRow(idx);
+    }
+  }
+
+  function addSetRow(exIdx, prefillReps = '') {
+    const container = document.getElementById(`sets-${exIdx}`);
+    const setIdx = container.children.length;
+    const div = document.createElement('div');
+    div.className = 'set-entry';
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;';
+    div.innerHTML = `
+      <span class="set-label" style="font-size:11px;color:var(--muted);width:42px;flex-shrink:0;">Set ${setIdx + 1}</span>
+      <input class="form-control" type="number" name="exercises[${exIdx}][sets][${setIdx}][reps]"
+             placeholder="Reps" min="1" value="${prefillReps !== null && prefillReps !== undefined ? prefillReps : ''}" style="flex:1;"/>
+      <button type="button" onclick="removeSetRow(this)"
+        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;">✕</button>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeSetRow(btn) {
+    const entry = btn.closest('.set-entry');
+    const container = entry.parentElement;
+    const exIdx = parseInt(entry.closest('.exercise-card').dataset.exIdx);
+    entry.remove();
+    Array.from(container.children).forEach((row, i) => {
+      row.querySelector('.set-label').textContent = `Set ${i + 1}`;
+      row.querySelector('input[type="number"]').name = `exercises[${exIdx}][sets][${i}][reps]`;
     });
   }
 

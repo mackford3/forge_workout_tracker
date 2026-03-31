@@ -76,10 +76,11 @@
   function addCircuitExRow(prefill = {}) {
     const idx = circIdx++;
     const row = document.createElement('div');
-    row.className = 'set-row card card-sm';
+    row.className = 'set-row card card-sm exercise-card';
     row.style.cssText = 'margin-bottom:8px;position:relative;';
+    row.dataset.exIdx = idx;
     row.innerHTML = `
-      <button type="button" onclick="this.closest('.set-row').remove()"
+      <button type="button" onclick="this.closest('.exercise-card').remove()"
         style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
       <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Exercise ${idx + 1}</div>
       <div class="form-group" style="margin-bottom:8px;">
@@ -94,11 +95,7 @@
                  class="exercise-name-hidden" value="${(prefill.name || '').replace(/"/g,'&quot;')}"/>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-        <div>
-          <label class="form-label">Reps</label>
-          <input class="form-control" type="number" name="exercises[${idx}][reps]" placeholder="10" value="${prefill.reps || ''}"/>
-        </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div>
           <label class="form-label">Weight (lbs)</label>
           <input class="form-control" type="number" step="0.5" name="exercises[${idx}][weight_lbs]" placeholder="0" value="${prefill.weight_lbs || ''}"/>
@@ -107,6 +104,14 @@
           <label class="form-label">Distance (m)</label>
           <input class="form-control" type="number" name="exercises[${idx}][distance_m]" placeholder="0" value="${prefill.distance_m || ''}"/>
         </div>
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <label class="form-label" style="margin:0;">Rounds / Sets</label>
+          <button type="button" onclick="addRoundRow(${idx})"
+            style="background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;">+ Add Round</button>
+        </div>
+        <div class="rounds-container" id="rounds-${idx}" data-field-group="sets"></div>
       </div>
       <div class="form-group" style="margin-top:8px;">
         <label class="form-label">Notes</label>
@@ -124,6 +129,66 @@
     });
     inputEl.addEventListener('blur', () => {
       if (!hiddenEl.value) nameEl.value = inputEl.value.trim();
+    });
+
+    if (prefill.sets && prefill.sets.length) {
+      prefill.sets.forEach(s => addRoundRow(idx, s.reps, s.distance_m));
+    } else if (prefill.reps || prefill.distance_m) {
+      addRoundRow(idx, prefill.reps, prefill.distance_m);
+    } else {
+      addRoundRow(idx);
+    }
+  }
+
+  function updateRoundType(sel) {
+    const entry = sel.closest('.round-entry');
+    const container = entry.parentElement;
+    const group = container.dataset.fieldGroup || 'sets';
+    const exIdx = parseInt(entry.closest('[data-ex-idx]').dataset.exIdx);
+    const roundIdx = Array.from(container.children).indexOf(entry);
+    const input = entry.querySelector('.round-val');
+    input.name = `exercises[${exIdx}][${group}][${roundIdx}][${sel.value}]`;
+    input.placeholder = sel.value === 'reps' ? 'Reps' : 'Distance (m)';
+    input.value = '';
+  }
+
+  function addRoundRow(exIdx, prefillReps = null, prefillDist = null) {
+    const container = document.getElementById(`rounds-${exIdx}`);
+    const roundIdx = container.children.length;
+    const group = container.dataset.fieldGroup || 'sets';
+    const type = (prefillDist != null && prefillDist !== '') ? 'distance_m' : 'reps';
+    const value = type === 'distance_m' ? (prefillDist || '') : (prefillReps || '');
+    const div = document.createElement('div');
+    div.className = 'round-entry';
+    div.style.marginBottom = '6px';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="round-label" style="font-size:11px;color:var(--muted);width:52px;flex-shrink:0;">Round ${roundIdx + 1}</span>
+        <select class="form-control round-type" onchange="updateRoundType(this)"
+                style="width:auto;flex-shrink:0;padding:6px 8px;font-size:12px;">
+          <option value="reps" ${type === 'reps' ? 'selected' : ''}>Reps</option>
+          <option value="distance_m" ${type === 'distance_m' ? 'selected' : ''}>Distance (m)</option>
+        </select>
+        <input class="form-control round-val" type="number"
+               name="exercises[${exIdx}][${group}][${roundIdx}][${type}]"
+               placeholder="${type === 'reps' ? 'Reps' : 'Distance (m)'}" min="1" value="${value}" style="flex:1;"/>
+        <button type="button" onclick="removeRoundRow(this)"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 2px;flex-shrink:0;">✕</button>
+      </div>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeRoundRow(btn) {
+    const entry = btn.closest('.round-entry');
+    const container = entry.parentElement;
+    const group = container.dataset.fieldGroup || 'sets';
+    const exIdx = parseInt(entry.closest('[data-ex-idx]').dataset.exIdx);
+    entry.remove();
+    Array.from(container.children).forEach((row, i) => {
+      row.querySelector('.round-label').textContent = `Round ${i + 1}`;
+      const sel = row.querySelector('.round-type');
+      row.querySelector('.round-val').name = `exercises[${exIdx}][${group}][${i}][${sel.value}]`;
     });
   }
 
