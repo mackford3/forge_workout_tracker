@@ -133,23 +133,39 @@
     </div>
   </div>
 
+  <style>
+  .circuit-ex-card .circuit-body { overflow:hidden; }
+  .circuit-ex-card.collapsed .circuit-body { display:none; }
+  .drag-handle { cursor:grab; user-select:none; }
+  .drag-handle:active { cursor:grabbing; }
+  .sortable-ghost { opacity:0.35; }
+  </style>
+
   <div id="circuit-exercises-container">
     {% for m in matched %}
     {% set ex = m.raw %}
     {% set found = m.exercise %}
     {% set ex_sets = m.sets %}
     {% set ei = loop.index0 %}
-    <div class="set-row card card-sm circuit-ex-card" style="margin-bottom:8px;position:relative;{% if not found %}border-color:#ff9800;{% endif %}"
+    <div class="card card-sm circuit-ex-card" style="margin-bottom:8px;{% if not found %}border-color:#ff9800;{% endif %}"
          data-ex-idx="{{ ei }}" data-default-weight="{{ ex.weight_lbs or '' }}" data-default-unit="{{ weight_unit }}">
-      <button type="button" onclick="this.closest('.circuit-ex-card').remove()"
-        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
-      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">
-        Exercise {{ loop.index }}
-        {% if not found %}<span style="color:#ff9800;margin-left:6px;">⚠ not found — select manually</span>{% endif %}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span class="drag-handle" style="color:var(--muted);font-size:18px;line-height:1;padding:0 2px;flex-shrink:0;" title="Drag to reorder">⠿</span>
+        <div style="flex:1;">
+          <div class="circuit-ex-label" style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">
+            {% if found %}{{ found.name }}{% else %}Exercise {{ loop.index }}{% if not found %} <span style="color:#ff9800;">⚠ not found</span>{% endif %}{% endif %}
+          </div>
+        </div>
+        <button type="button" class="collapse-btn" onclick="toggleCircuitCollapse(this.closest('.circuit-ex-card'))"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;">▾</button>
+        <button type="button" onclick="this.closest('.circuit-ex-card').remove()"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 2px;">✕</button>
       </div>
+      <div class="circuit-body">
       <div class="form-group" style="margin-bottom:8px;">
         <label class="form-label">Exercise</label>
-        <select class="form-control" name="exercises[{{ ei }}][exercise_id]" required>
+        <select class="form-control" name="exercises[{{ ei }}][exercise_id]" required
+          onchange="const lbl=this.closest('.circuit-ex-card').querySelector('.circuit-ex-label');if(lbl&&this.selectedIndex>0)lbl.textContent=this.options[this.selectedIndex].text.trim();">
           <option value="">Select exercise...</option>
           {% set cur_group = namespace(val=None) %}
           {% for e in all_exercises %}
@@ -222,6 +238,7 @@
         <input class="form-control" name="exercises[{{ ei }}][notes]" value="{{ ex.notes }}"/>
       </div>
       {% endif %}
+      </div>{# /circuit-body #}
     </div>
     {% endfor %}
   </div>
@@ -326,30 +343,44 @@
     });
   }
 
+  function toggleCircuitCollapse(card) {
+    card.classList.toggle('collapsed');
+    card.querySelector('.collapse-btn').textContent = card.classList.contains('collapsed') ? '▸' : '▾';
+  }
+
   function addExercise() {
     const unit = document.getElementById('global-unit').value;
     const idx  = exIdx++;
     const row  = document.createElement('div');
-    row.className = 'set-row card card-sm circuit-ex-card';
-    row.style.cssText = 'margin-bottom:8px;position:relative;';
+    row.className = 'card card-sm circuit-ex-card';
+    row.style.cssText = 'margin-bottom:8px;';
     row.dataset.exIdx = idx;
     row.dataset.defaultWeight = '';
     row.dataset.defaultUnit = unit;
     row.innerHTML = `
-      <button type="button" onclick="this.closest('.circuit-ex-card').remove()"
-        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
-      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Exercise ${idx + 1}</div>
-      <div class="form-group" style="margin-bottom:8px;">
-        <label class="form-label">Exercise</label>
-        <select class="form-control" name="exercises[${idx}][exercise_id]" required>${buildOptions()}</select>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span class="drag-handle" style="color:var(--muted);font-size:18px;line-height:1;padding:0 2px;flex-shrink:0;" title="Drag to reorder">⠿</span>
+        <div class="circuit-ex-label" style="flex:1;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Exercise ${idx + 1}</div>
+        <button type="button" class="collapse-btn" onclick="toggleCircuitCollapse(this.closest('.circuit-ex-card'))"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;">▾</button>
+        <button type="button" onclick="this.closest('.circuit-ex-card').remove()"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 2px;">✕</button>
       </div>
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <label class="form-label" style="margin:0;font-size:11px;">ROUNDS</label>
-          <button type="button" onclick="addLogRound(${idx})"
-            style="background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;">+ Add Round</button>
+      <div class="circuit-body">
+        <div class="form-group" style="margin-bottom:8px;">
+          <label class="form-label">Exercise</label>
+          <select class="form-control" name="exercises[${idx}][exercise_id]" required
+            onchange="const lbl=this.closest('.circuit-ex-card').querySelector('.circuit-ex-label');if(lbl&&this.selectedIndex>0)lbl.textContent=this.options[this.selectedIndex].text.trim();"
+          >${buildOptions()}</select>
         </div>
-        <div class="log-rounds-container" id="log-rounds-${idx}" data-field-group="rounds"></div>
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <label class="form-label" style="margin:0;font-size:11px;">ROUNDS</label>
+            <button type="button" onclick="addLogRound(${idx})"
+              style="background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;">+ Add Round</button>
+          </div>
+          <div class="log-rounds-container" id="log-rounds-${idx}" data-field-group="rounds"></div>
+        </div>
       </div>
     `;
     document.getElementById('circuit-exercises-container').appendChild(row);
@@ -392,5 +423,13 @@
     for (let i = 0; i < rounds; i++) addSplit();
   });
   {% endif %}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+Sortable.create(document.getElementById('circuit-exercises-container'), {
+  handle: '.drag-handle',
+  animation: 150,
+  ghostClass: 'sortable-ghost',
+});
 </script>
 {% endblock %}

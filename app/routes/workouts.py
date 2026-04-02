@@ -148,6 +148,7 @@ def log_strength():
                 weight_kg   = weight_kg,
                 weight_lbs  = weight_lbs,
                 reps        = int(f[f'sets[{i}][reps]']) if f.get(f'sets[{i}][reps]') else None,
+                duration_s  = int(f[f'sets[{i}][duration_s]']) if f.get(f'sets[{i}][duration_s]') else None,
                 rpe         = float(f[f'sets[{i}][rpe]']) if f.get(f'sets[{i}][rpe]') else None,
                 notes       = f.get(f'sets[{i}][notes]'),
             ))
