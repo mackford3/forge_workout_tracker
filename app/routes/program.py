@@ -156,7 +156,20 @@ def week(program_id, week_num):
         d._workout_id = comp.workout_id if comp else None
         d._done_date  = comp.done_date  if comp else None
         try:
-            d._exercises = json.loads(d.exercises) if d.exercises else []
+            raw = json.loads(d.exercises) if d.exercises else []
+            d._exercises = []
+            for item in raw:
+                if isinstance(item, dict):
+                    label = item.get('name', '')
+                    sets = item.get('sets', '')
+                    reps = item.get('reps', '')
+                    if sets and reps:
+                        label += f' {sets}x{reps}'
+                    elif sets:
+                        label += f' {sets} sets'
+                    d._exercises.append(label)
+                else:
+                    d._exercises.append(item)
         except Exception:
             d._exercises = []
 
@@ -198,19 +211,29 @@ def start_day(day_id):
                                 preset=preset_key, program_day_id=day_id))
 
     try:
-        exercise_names = json.loads(day.exercises) if day.exercises else []
+        raw_exercises = json.loads(day.exercises) if day.exercises else []
     except Exception:
-        exercise_names = []
+        raw_exercises = []
 
-    # Match exercise names to DB exercise IDs (fuzzy: contains match)
     all_exercises = Exercise.query.order_by(Exercise.name).all()
-    ex_map = {e.name.lower(): e for e in all_exercises}
+    ex_by_id  = {e.id: e for e in all_exercises}
+    ex_map    = {e.name.lower(): e for e in all_exercises}
 
     matched = []
-    for name in exercise_names:
-        cleaned = clean_exercise_name(name)
-        found   = fuzzy_match(cleaned, ex_map)
-        matched.append({'name': name, 'exercise': found})
+    for item in raw_exercises:
+        if isinstance(item, dict):
+            # Structured format: has exercise_id
+            ex_id = item.get('exercise_id')
+            name  = item.get('name', '')
+            found = ex_by_id.get(ex_id) if ex_id else None
+            if not found:
+                found = fuzzy_match(clean_exercise_name(name), ex_map)
+            matched.append({'name': name, 'exercise': found})
+        else:
+            # Legacy plain-string format
+            cleaned = clean_exercise_name(item)
+            found   = fuzzy_match(cleaned, ex_map)
+            matched.append({'name': item, 'exercise': found})
 
     return render_template('program/start_workout.html',
         day=day, program=program, matched=matched,
@@ -275,21 +298,50 @@ def link_workout(day_id):
 @program_bp.route('/day/<int:day_id>/edit', methods=['GET', 'POST'])
 def edit_day(day_id):
     day = ProgramDay.query.get_or_404(day_id)
+    all_exercises = Exercise.query.order_by(Exercise.name).all()
     if request.method == 'POST':
         day.name  = request.form.get('name', day.name)
         day.notes = request.form.get('notes', '')
-        exercises_raw = request.form.get('exercises', '')
-        # Parse newline-separated list into JSON array
-        exs = [e.strip() for e in exercises_raw.split('\n') if e.strip()]
+
+        # Parse structured exercise rows (non-contiguous safe)
+        f = request.form
+        row_indices = sorted(set(
+            int(k.split('[')[1].split(']')[0])
+            for k in f.keys() if k.startswith('exercises[') and '[name]' in k
+        ))
+        exs = []
+        validation_error = None
+        for i in row_indices:
+            name = (f.get(f'exercises[{i}][name]') or '').strip()
+            ex_id = (f.get(f'exercises[{i}][exercise_id]') or '').strip()
+            sets = (f.get(f'exercises[{i}][sets]') or '').strip()
+            reps = (f.get(f'exercises[{i}][reps]') or '').strip()
+            if not name:
+                continue
+            if name and not ex_id:
+                validation_error = f'"{name}" was not selected from the exercise library. Please pick from the dropdown.'
+                break
+            exs.append({'name': name, 'exercise_id': int(ex_id), 'sets': sets, 'reps': reps})
+
+        if validation_error:
+            try:
+                ex_list = json.loads(day.exercises) if day.exercises else []
+            except Exception:
+                ex_list = []
+            return render_template('program/edit_day.html', day=day, ex_list=ex_list,
+                                   all_exercises=all_exercises, validation_error=validation_error)
+
         day.exercises = json.dumps(exs)
         db.session.commit()
         return redirect(url_for('program.week',
             program_id=day.program_id, week_num=day.week_number))
+
     try:
         ex_list = json.loads(day.exercises) if day.exercises else []
     except Exception:
         ex_list = []
-    return render_template('program/edit_day.html', day=day, ex_list=ex_list)
+    return render_template('program/edit_day.html', day=day, ex_list=ex_list,
+                           all_exercises=all_exercises)
 
 
 @program_bp.route('/<int:program_id>/activate', methods=['POST'])

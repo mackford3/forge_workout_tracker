@@ -34,7 +34,7 @@ def index():
 def new():
     if request.method == 'POST':
         f = request.form
-        ex = Exercise(name=f['name'], muscle_group=f.get('muscle_group'), category=f.get('category', 'strength'))
+        ex = Exercise(name=f['name'], muscle_group=f.get('muscle_group'), category=f.get('category', 'strength'), unit_type=f.get('unit_type', 'reps'))
         db.session.add(ex)
         db.session.commit()
         return redirect(url_for('exercises.index'))
@@ -49,6 +49,7 @@ def edit(ex_id):
         ex.name         = f['name']
         ex.muscle_group = f.get('muscle_group', ex.muscle_group)
         ex.category     = f.get('category', ex.category)
+        ex.unit_type    = f.get('unit_type', ex.unit_type)
         db.session.commit()
         return redirect(url_for('exercises.index'))
     return render_template('exercises/edit.html', ex=ex)
@@ -75,17 +76,20 @@ def find_or_create():
             'id': existing.id,
             'name': existing.name,
             'muscle_group': existing.muscle_group or '',
+            'unit_type': existing.unit_type or 'reps',
             'created': False,
         })
 
     muscle_group = (data.get('muscle_group') or '').strip() or None
     category     = (data.get('category') or 'strength').strip()
-    ex = Exercise(name=name, muscle_group=muscle_group, category=category)
+    unit_type    = (data.get('unit_type') or 'reps').strip()
+    ex = Exercise(name=name, muscle_group=muscle_group, category=category, unit_type=unit_type)
     db.session.add(ex)
     db.session.commit()
     return jsonify({
         'id': ex.id,
         'name': ex.name,
         'muscle_group': ex.muscle_group or '',
+        'unit_type': ex.unit_type or 'reps',
         'created': True,
     }), 201

@@ -43,6 +43,10 @@
       <div class="form-group"><label class="form-label">Session RPE</label>
         <input class="form-control" type="number" step="0.5" min="1" max="10" name="session_rpe" placeholder="7"/></div>
     </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">Notes</label>
+      <textarea class="form-control" name="notes" rows="2" placeholder="How did it go?" style="resize:vertical;"></textarea>
+    </div>
   </div>
 
   <!-- Unit selector -->
@@ -69,31 +73,36 @@
   </button>
 </form>
 
+<style>
+.exercise-block .block-body { overflow:hidden; }
+.exercise-block.collapsed .block-body { display:none; }
+.drag-handle { cursor:grab; user-select:none; touch-action:none; }
+.drag-handle:active { cursor:grabbing; }
+.sortable-ghost { opacity:0.35; }
+</style>
+
 <script>
 const allExercises = [
   {% for ex in all_exercises %}
-  { id: {{ ex.id }}, name: "{{ ex.name }}", group: "{{ ex.muscle_group or '' }}" },
+  { id: {{ ex.id }}, name: "{{ ex.name }}", group: "{{ ex.muscle_group or '' }}", unitType: "{{ ex.unit_type or 'reps' }}" },
   {% endfor %}
 ];
 
-// Pre-matched exercises from template
 const templateExercises = [
   {% for m in matched %}
   { name: {{ m.name | tojson }}, exercise_id: {{ m.exercise.id if m.exercise else 'null' }} },
   {% endfor %}
 ];
 
-let globalSetIndex    = 0;
-let globalCardioIndex = 0;
-let exerciseCount     = 0;
+let globalSetIndex = 0, globalCardioIndex = 0, exerciseCount = 0;
 
+// ── Exercise dropdown ──────────────────────────────────────
 function buildExDropdown(query) {
   const q = query.toLowerCase().trim();
   const filtered = q
     ? allExercises.filter(ex => ex.name.toLowerCase().includes(q) || ex.group.toLowerCase().includes(q))
     : allExercises.slice(0, 60);
-  let html = '';
-  let curGroup = null;
+  let html = '', curGroup = null;
   filtered.forEach(ex => {
     if (ex.group !== curGroup) {
       html += `<div style="padding:5px 14px 3px;font-size:10px;font-weight:700;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;background:var(--surface);position:sticky;top:0;">${ex.group || 'Other'}</div>`;
@@ -108,8 +117,7 @@ function buildExDropdown(query) {
     html += `<div class="ex-opt" data-id="__add__" data-name="${q.replace(/"/g,'&quot;')}"
       style="padding:10px 14px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);"
       onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background=''">
-      ➕ Add "<strong>${q}</strong>" to library
-    </div>`;
+      ➕ Add "<strong>${q}</strong>" to library</div>`;
   }
   return html || '<div style="padding:10px 14px;color:var(--muted);font-size:13px;">No matches</div>';
 }
@@ -127,104 +135,158 @@ function filterExDrop(input, exIdx) {
   const block = input.closest('.exercise-block');
   block.querySelector('.exercise-id-input').value = '';
   syncExerciseToSets(parseInt(block.dataset.exIdx));
+  updateBlockSummary(exIdx);
 }
 
 function hideExDrop(exIdx) {
-  setTimeout(() => {
-    const drop = document.getElementById(`ex-drop-${exIdx}`);
-    if (drop) drop.style.display = 'none';
-  }, 180);
+  setTimeout(() => { const d = document.getElementById(`ex-drop-${exIdx}`); if (d) d.style.display = 'none'; }, 180);
 }
 
 function pickExercise(dropEl, exIdx) {
   const opt = dropEl.closest('.ex-opt');
   if (!opt) return;
-  const id   = opt.dataset.id;
-  const name = opt.dataset.name;
+  const id = opt.dataset.id, name = opt.dataset.name;
   const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
   document.getElementById(`ex-drop-${exIdx}`).style.display = 'none';
-  if (id === '__add__') {
-    createExerciseInline(name, exIdx);
-    return;
-  }
-  block.querySelector('.ex-search-input').value  = name;
+  if (id === '__add__') { createExerciseInline(name, exIdx); return; }
+  block.querySelector('.ex-search-input').value = name;
   block.querySelector('.exercise-id-input').value = id;
   block.style.borderColor = '';
   block.querySelector('.ex-search-input').style.borderColor = '';
   block.querySelector('.ex-validate-msg')?.remove();
   syncExerciseToSets(exIdx);
+  updateBlockSummary(exIdx);
+  const exData = allExercises.find(e => e.id == id);
+  if (exData?.unitType) setExerciseUnit(block, exIdx, exData.unitType);
   loadHistory(id, exIdx);
 }
 
 function createExerciseInline(name, exIdx) {
   const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
   ExerciseSearch.showCreateModal(name, allExercises, block, (data) => {
-    allExercises.push({ id: data.id, name: data.name, group: data.muscle_group || '' });
-    block.querySelector('.ex-search-input').value   = data.name;
+    allExercises.push({ id: data.id, name: data.name, group: data.muscle_group || '', unitType: data.unit_type || 'reps' });
+    block.querySelector('.ex-search-input').value = data.name;
     block.querySelector('.exercise-id-input').value = data.id;
     block.style.borderColor = '';
     block.querySelector('.ex-search-input').style.borderColor = '';
     block.querySelector('.ex-validate-msg')?.remove();
     syncExerciseToSets(exIdx);
+    updateBlockSummary(exIdx);
     loadHistory(data.id, exIdx);
   });
 }
 
-function moveBlock(btn, dir) {
-  const block = btn.closest('.exercise-block');
-  const container = document.getElementById('exercises-container');
-  const blocks = [...container.querySelectorAll(':scope > .exercise-block')];
-  const idx = blocks.indexOf(block);
-  if (dir === -1 && idx > 0) container.insertBefore(block, blocks[idx - 1]);
-  else if (dir === 1 && idx < blocks.length - 1) container.insertBefore(blocks[idx + 1], block);
+// ── Unit toggle ────────────────────────────────────────────
+const UNIT_CYCLE  = ['reps', 'seconds', 'reps_weight'];
+const UNIT_LABELS = { reps: 'Reps', seconds: 'Secs', reps_weight: 'Reps+Wt' };
+
+function setExerciseUnit(block, exIdx, unitType) {
+  block.dataset.unitType = unitType;
+  const btn = block.querySelector('.unit-toggle-btn');
+  if (btn) btn.textContent = UNIT_LABELS[unitType] || 'Reps';
+  const isSeconds = unitType === 'seconds';
+  block.querySelectorAll('.set-card').forEach(card => {
+    card.querySelector('.reps-label').textContent  = isSeconds ? 'Seconds' : 'Reps';
+    card.querySelector('.reps-input').style.display = isSeconds ? 'none' : '';
+    card.querySelector('.dur-input').style.display  = isSeconds ? '' : 'none';
+    card.querySelector('.weight-row').style.display = isSeconds ? 'none' : '';
+    card.querySelector('.unit-row').style.display   = isSeconds ? 'none' : '';
+  });
 }
 
-function addExercise(selectedExerciseId = '', labelHint = '') {
+function cycleExerciseUnit(block, exIdx) {
+  const cur = block.dataset.unitType || 'reps';
+  setExerciseUnit(block, exIdx, UNIT_CYCLE[(UNIT_CYCLE.indexOf(cur) + 1) % UNIT_CYCLE.length]);
+}
+
+// ── Collapse ───────────────────────────────────────────────
+function toggleCollapse(block) {
+  const wasCollapsed = block.classList.contains('collapsed');
+  block.classList.toggle('collapsed');
+  block.querySelector('.collapse-btn').textContent = block.classList.contains('collapsed') ? '▸' : '▾';
+  const doneEl = block.querySelector('.summary-done');
+  if (doneEl) doneEl.style.display = (!wasCollapsed) ? '' : 'none';
+}
+
+function updateBlockSummary(exIdx) {
+  const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
+  if (!block) return;
+  const name     = block.querySelector('.ex-search-input')?.value.trim() || 'New Exercise';
+  const setCount = block.querySelectorAll('.set-card').length;
+  block.querySelector('.summary-name').textContent = name;
+  const metaEl = block.querySelector('.summary-sets');
+  if (metaEl) metaEl.textContent = setCount ? `${setCount} set${setCount !== 1 ? 's' : ''}` : '';
+}
+
+function insertExerciseAfter(block) { addExercise('', '', block); }
+
+// ── Add exercise block ─────────────────────────────────────
+function addExercise(selectedExerciseId = '', labelHint = '', insertAfterBlock = null) {
   const exIdx = exerciseCount++;
   const unit  = document.getElementById('global-unit').value;
-  const matchFailed = labelHint && !selectedExerciseId;
-  const selectedName = selectedExerciseId
-    ? (allExercises.find(e => e.id == selectedExerciseId)?.name || '') : '';
+  const matchFailed  = labelHint && !selectedExerciseId;
+  const selectedName = selectedExerciseId ? (allExercises.find(e => e.id == selectedExerciseId)?.name || '') : '';
 
   const block = document.createElement('div');
   block.className = 'exercise-block card';
-  block.dataset.exIdx = exIdx;
-  block.style.cssText = `margin-bottom:10px;position:relative;${matchFailed ? 'border-color:#ff9800;' : ''}`;
+  block.dataset.exIdx    = exIdx;
+  block.dataset.unitType = 'reps';
+  block.style.cssText = `margin-bottom:10px;${matchFailed ? 'border-color:#ff9800;' : ''}`;
 
   block.innerHTML = `
-    <div style="display:flex;align-items:center;gap:6px;position:absolute;top:10px;right:10px;z-index:1;">
-      <button type="button" onclick="moveBlock(this,-1)"
-        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;" title="Move up">↑</button>
-      <button type="button" onclick="moveBlock(this,1)"
-        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;" title="Move down">↓</button>
-      <button type="button" onclick="this.closest('.exercise-block').remove()"
-        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">✕</button>
-    </div>
-    ${labelHint ? `<div style="font-size:10px;font-family:'DM Mono',monospace;margin-bottom:6px;${matchFailed ? 'color:#ff9800;' : 'color:var(--muted);'}">Template: ${labelHint}${matchFailed ? ' ⚠ not found — select manually' : ''}</div>` : ''}
-    <div class="form-group" style="margin-bottom:8px;padding-right:80px;">
-      <label class="form-label">Exercise</label>
-      <div style="position:relative;">
-        <input type="text" class="form-control ex-search-input" value="${selectedName}"
-          placeholder="Type to search exercise..."
-          autocomplete="off"
-          oninput="filterExDrop(this, ${exIdx})"
-          onfocus="showExDrop(this, ${exIdx})"
-          onblur="hideExDrop(${exIdx})"/>
-        <input type="hidden" class="exercise-id-input" value="${selectedExerciseId || ''}"/>
-        <div id="ex-drop-${exIdx}" onmousedown="event.preventDefault()" onclick="pickExercise(event.target, ${exIdx})"
-          style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:200;
-                 background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-                 max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span class="drag-handle" style="color:var(--muted);font-size:18px;line-height:1;padding:0 2px;flex-shrink:0;" title="Drag to reorder">⠿</span>
+      <div style="flex:1;min-width:0;">
+        <div class="summary-name" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);">${selectedName || (labelHint ? labelHint : 'New Exercise')}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px;display:flex;gap:6px;align-items:center;">
+          <span class="summary-sets"></span>
+          <span class="summary-done" style="display:none;color:var(--accent);">✓</span>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+        <button type="button" class="unit-toggle-btn" onclick="cycleExerciseUnit(this.closest('.exercise-block'), ${exIdx})"
+          style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-size:10px;padding:2px 6px;line-height:1.6;white-space:nowrap;">Reps</button>
+        <button type="button" class="collapse-btn" onclick="toggleCollapse(this.closest('.exercise-block'))"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;" title="Collapse">▾</button>
+        <button type="button" onclick="this.closest('.exercise-block').remove()"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 2px;">✕</button>
       </div>
     </div>
-    <div id="history-${exIdx}" style="margin-bottom:4px;"></div>
-    <div class="sets-row" id="sets-row-${exIdx}"
-      style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;align-items:flex-end;"></div>
-    <button type="button" onclick="addSet(${exIdx})" class="btn btn-secondary btn-full"
-      style="margin-top:8px;border-style:dashed;font-size:13px;">+ Add Set</button>
+
+    <div class="block-body">
+      ${labelHint ? `<div style="font-size:10px;font-family:'DM Mono',monospace;margin-bottom:8px;${matchFailed ? 'color:#ff9800;' : 'color:var(--muted);'}">Template: ${labelHint}${matchFailed ? ' ⚠ not found — select manually' : ''}</div>` : ''}
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">Exercise</label>
+        <div style="position:relative;">
+          <input type="text" class="form-control ex-search-input" value="${selectedName}"
+            placeholder="Type to search exercise..." autocomplete="off"
+            oninput="filterExDrop(this, ${exIdx})"
+            onfocus="showExDrop(this, ${exIdx})"
+            onblur="hideExDrop(${exIdx})"/>
+          <input type="hidden" class="exercise-id-input" value="${selectedExerciseId || ''}"/>
+          <div id="ex-drop-${exIdx}" onmousedown="event.preventDefault()" onclick="pickExercise(event.target, ${exIdx})"
+            style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:200;
+                   background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+                   max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
+        </div>
+      </div>
+      <div id="history-${exIdx}" style="margin-bottom:4px;"></div>
+      <div class="sets-row" id="sets-row-${exIdx}" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;align-items:flex-end;"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button type="button" onclick="addSet(${exIdx})" class="btn btn-secondary" style="flex:1;border-style:dashed;font-size:13px;">+ Add Set</button>
+        <button type="button" onclick="insertExerciseAfter(this.closest('.exercise-block'))"
+          class="btn btn-secondary" style="border-style:dashed;font-size:13px;padding:8px 14px;" title="Insert exercise after this">+ Exercise</button>
+      </div>
+    </div>
   `;
-  document.getElementById('exercises-container').appendChild(block);
+
+  if (insertAfterBlock) {
+    insertAfterBlock.insertAdjacentElement('afterend', block);
+  } else {
+    document.getElementById('exercises-container').appendChild(block);
+  }
   addSet(exIdx);
+  updateBlockSummary(exIdx);
   if (selectedExerciseId) loadHistory(selectedExerciseId, exIdx);
 }
 
@@ -237,64 +299,133 @@ async function loadHistory(exerciseId, exIdx) {
   container.innerHTML = html;
   const prMatch = html.match(/data-last-weight="([\d.]+)"/);
   if (prMatch) {
-    const row = document.getElementById(`sets-row-${exIdx}`);
-    row.querySelectorAll('input[name*="[weight]"]').forEach(inp => {
+    document.getElementById(`sets-row-${exIdx}`)?.querySelectorAll('input[name*="[weight]"]').forEach(inp => {
       if (!inp.value) inp.value = prMatch[1];
     });
   }
 }
 
+// ── Set management ─────────────────────────────────────────
 function addSet(exIdx) {
   const idx      = globalSetIndex++;
   const unit     = document.getElementById('global-unit').value;
   const row      = document.getElementById(`sets-row-${exIdx}`);
   const setCards = row.querySelectorAll('.set-card');
   const setNum   = setCards.length + 1;
+  const exBlock  = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
+  const isSeconds = (exBlock?.dataset.unitType || 'reps') === 'seconds';
+
   let prevWeight = '';
   if (setCards.length > 0) {
     const lw = setCards[setCards.length - 1].querySelector('input[name*="[weight]"]');
     if (lw) prevWeight = lw.value;
   }
+
   const card = document.createElement('div');
   card.className = 'set-card';
   card.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;min-width:110px;flex-shrink:0;position:relative;';
   card.innerHTML = `
-    <button type="button" onclick="this.closest('.set-card').remove()"
-      style="position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;">✕</button>
-    <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">Set ${setNum}</div>
-    <input type="hidden" name="sets[${idx}][set_number]" value="${setNum}"/>
-    <div style="margin-bottom:6px;"><label class="form-label" style="font-size:10px;">Weight</label>
+    <button type="button" onclick="removeSet(this, ${exIdx})"
+      style="position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;">✕</button>
+    <div class="set-label" style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">Set ${setNum}</div>
+    <input type="hidden" class="set-number-input" name="sets[${idx}][set_number]" value="${setNum}"/>
+    <div class="weight-row" style="margin-bottom:6px;${isSeconds ? 'display:none;' : ''}">
+      <label class="form-label" style="font-size:10px;">Weight</label>
       <input class="form-control" type="number" step="0.5" min="0" name="sets[${idx}][weight]"
-        placeholder="0" value="${prevWeight}" style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;"/></div>
-    <div style="margin-bottom:6px;">
+        placeholder="0" value="${prevWeight}" style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;"/>
+    </div>
+    <div class="unit-row" style="margin-bottom:6px;${isSeconds ? 'display:none;' : ''}">
       <select class="form-control unit-select" name="sets[${idx}][unit]" style="padding:4px 6px;font-size:12px;">
-        <option value="lbs" ${unit=='lbs'?'selected':''}>lbs</option>
-        <option value="kg"  ${unit=='kg' ?'selected':''}>kg</option>
-      </select></div>
-    <div style="margin-bottom:6px;"><label class="form-label" style="font-size:10px;">Reps</label>
-      <input class="form-control" type="number" min="0" name="sets[${idx}][reps]" placeholder="0"
-        style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;color:var(--accent);"/></div>
-    <div><label class="form-label" style="font-size:10px;">RPE</label>
-      <input class="form-control" type="number" step="0.5" min="1" max="10" name="sets[${idx}][rpe]"
-        placeholder="—" style="text-align:center;padding:6px 4px;font-size:13px;"/></div>
+        <option value="lbs" ${unit==='lbs'?'selected':''}>lbs</option>
+        <option value="kg"  ${unit==='kg' ?'selected':''}>kg</option>
+      </select>
+    </div>
+    <div style="margin-bottom:6px;">
+      <label class="form-label reps-label" style="font-size:10px;">${isSeconds ? 'Seconds' : 'Reps'}</label>
+      <input class="form-control reps-input" type="number" min="0" name="sets[${idx}][reps]" placeholder="0"
+        style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;color:var(--accent);${isSeconds ? 'display:none;' : ''}"/>
+      <input class="form-control dur-input" type="number" min="0" name="sets[${idx}][duration_s]" placeholder="0"
+        style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;color:var(--run);${isSeconds ? '' : 'display:none;'}"/>
+    </div>
+    <div>
+      <label class="form-label" style="font-size:10px;">RPE</label>
+      <input class="form-control" type="number" step="0.5" min="1" max="10" name="sets[${idx}][rpe]" placeholder="—"
+        style="text-align:center;padding:6px 4px;font-size:13px;"/>
+    </div>
     <input type="hidden" class="set-exercise-ref" data-ex-idx="${exIdx}" name="sets[${idx}][exercise_id]" value=""/>
   `;
   row.appendChild(card);
   syncExerciseToSets(exIdx);
+  updateBlockSummary(exIdx);
   card.querySelector('input[name*="[reps]"]').focus();
+}
+
+function removeSet(btn, exIdx) {
+  btn.closest('.set-card').remove();
+  renumberSets(exIdx);
+}
+
+function renumberSets(exIdx) {
+  const row = document.getElementById(`sets-row-${exIdx}`);
+  if (!row) return;
+  row.querySelectorAll('.set-card').forEach((card, i) => {
+    card.querySelector('.set-label').textContent = `Set ${i + 1}`;
+    card.querySelector('.set-number-input').value = i + 1;
+  });
+  updateBlockSummary(exIdx);
 }
 
 function syncExerciseToSets(exIdx) {
   const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
   if (!block) return;
-  const idInput = block.querySelector('.exercise-id-input');
-  block.querySelectorAll('.set-exercise-ref').forEach(r => r.value = idInput ? idInput.value : '');
+  const id = block.querySelector('.exercise-id-input')?.value || '';
+  block.querySelectorAll('.set-exercise-ref').forEach(r => r.value = id);
 }
 
 function setGlobalUnit(unit) {
   document.querySelectorAll('.unit-select').forEach(s => s.value = unit);
 }
 
+// ── Inline cardio set ───────────────────────────────────────
+function addCardioSet() {
+  const idx = globalCardioIndex++;
+  const block = document.createElement('div');
+  block.className = 'card cardio-block';
+  block.style.cssText = 'margin-bottom:10px;border-color:color-mix(in srgb,var(--run) 35%,transparent);';
+  block.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <span class="drag-handle" style="color:var(--muted);font-size:18px;line-height:1;padding:0 2px;flex-shrink:0;">⠿</span>
+      <div style="flex:1;font-size:13px;font-weight:600;color:var(--run);">🚣 CARDIO SET</div>
+      <button type="button" onclick="this.closest('.cardio-block').remove()"
+        style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div><label class="form-label">Machine</label>
+        <select class="form-control" name="cardio[${idx}][machine]">
+          <option value="row">Row Machine (ERG)</option>
+          <option value="skierg">SkiErg</option>
+          <option value="bike">Assault Bike</option>
+          <option value="treadmill">Treadmill</option>
+          <option value="other">Other</option>
+        </select></div>
+      <div><label class="form-label">Distance (m)</label>
+        <input class="form-control" type="number" name="cardio[${idx}][distance_m]" placeholder="1000" style="font-family:'DM Mono',monospace;"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+      <div><label class="form-label">Time (MM:SS)</label>
+        <input class="form-control" name="cardio[${idx}][duration]" placeholder="4:00" style="font-family:'DM Mono',monospace;"/></div>
+      <div><label class="form-label">Calories</label>
+        <input class="form-control" type="number" name="cardio[${idx}][calories]" placeholder="—" style="font-family:'DM Mono',monospace;"/></div>
+      <div><label class="form-label">Damper</label>
+        <input class="form-control" type="number" min="1" max="10" name="cardio[${idx}][damper]" placeholder="4" style="font-family:'DM Mono',monospace;"/></div>
+      <div><label class="form-label">RPE</label>
+        <input class="form-control" type="number" step="0.5" min="1" max="10" name="cardio[${idx}][rpe]" placeholder="—" style="font-family:'DM Mono',monospace;"/></div>
+    </div>
+  `;
+  document.getElementById('exercises-container').appendChild(block);
+}
+
+// ── Form submit validation ─────────────────────────────────
 document.getElementById('strength-form').addEventListener('submit', function(e) {
   let invalid = false;
   document.querySelectorAll('.exercise-block').forEach(block => {
@@ -316,11 +447,17 @@ document.getElementById('strength-form').addEventListener('submit', function(e) 
   if (invalid) e.preventDefault();
 });
 
-// Auto-populate exercises from template
-templateExercises.forEach(pe => {
-  addExercise(pe.exercise_id || '', pe.name);
-});
+// ── Initialise ─────────────────────────────────────────────
+templateExercises.forEach(pe => addExercise(pe.exercise_id || '', pe.name));
 if (templateExercises.length === 0) addExercise();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+Sortable.create(document.getElementById('exercises-container'), {
+  handle: '.drag-handle',
+  animation: 150,
+  ghostClass: 'sortable-ghost',
+});
 </script>
 <script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
 {% endblock %}

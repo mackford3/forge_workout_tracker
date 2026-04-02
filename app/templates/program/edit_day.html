@@ -11,7 +11,7 @@
   Week {{ day.week_number }} · {{ day.day_of_week }}
 </div>
 
-<form method="post">
+<form method="post" id="edit-day-form">
   <div class="card" style="margin-bottom:12px;">
     <div class="form-group">
       <label class="form-label">Workout Name</label>
@@ -23,18 +23,169 @@
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:12px;">
-    <label class="form-label">Exercises (one per line)</label>
-    <textarea class="form-control" name="exercises" rows="12"
-      placeholder="Back Squat 4x8-10&#10;Romanian Deadlift 4x8-10&#10;..."
-      style="font-family:'DM Mono',monospace;font-size:13px;line-height:1.6;">{{ ex_list | join('\n') }}</textarea>
-    <div style="font-size:11px;color:var(--muted);margin-top:6px;">
-      Format: exercise name + sets/reps. Example: "Back Squat 4x8-10"
-    </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <h2 style="font-size:16px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;margin:0;">Exercises</h2>
+    <span style="font-size:11px;color:var(--muted);">Drag to reorder</span>
   </div>
+
+  <div id="ex-rows-container" style="margin-bottom:10px;"></div>
+
+  <button type="button" class="btn btn-secondary btn-full" style="border-style:dashed;margin-bottom:16px;" onclick="addExRow()">
+    + Add Exercise
+  </button>
+
+  {% if validation_error %}
+  <div style="color:#ff4466;font-size:13px;background:rgba(255,68,102,0.1);border:1px solid rgba(255,68,102,0.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;">
+    {{ validation_error }}
+  </div>
+  {% endif %}
 
   <button type="submit" class="btn btn-primary btn-full" style="font-size:16px;padding:14px;">
     Save Changes ✓
   </button>
 </form>
+
+<script>
+const allExercises = [
+  {% for ex in all_exercises %}
+  { id: {{ ex.id }}, name: "{{ ex.name }}", group: "{{ ex.muscle_group or '' }}" },
+  {% endfor %}
+];
+
+// Existing exercises from program day (structured or legacy string format)
+const existingExercises = {{ ex_list | tojson }};
+
+let rowCount = 0;
+
+function buildExDropdown(query) {
+  const q = query.toLowerCase().trim();
+  const filtered = q
+    ? allExercises.filter(ex => ex.name.toLowerCase().includes(q) || ex.group.toLowerCase().includes(q))
+    : allExercises.slice(0, 60);
+  let html = '';
+  let curGroup = null;
+  filtered.forEach(ex => {
+    if (ex.group !== curGroup) {
+      html += `<div style="padding:5px 14px 3px;font-size:10px;font-weight:700;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;background:var(--surface);position:sticky;top:0;">${ex.group || 'Other'}</div>`;
+      curGroup = ex.group;
+    }
+    html += `<div class="ex-opt" data-id="${ex.id}" data-name="${ex.name.replace(/"/g,'&quot;')}"
+      style="padding:10px 14px;cursor:pointer;font-size:14px;"
+      onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background=''">${ex.name}</div>`;
+  });
+  return html || '<div style="padding:10px 14px;color:var(--muted);font-size:13px;">No matches</div>';
+}
+
+function addExRow(name = '', exerciseId = '', sets = '', reps = '') {
+  const ri = rowCount++;
+  const row = document.createElement('div');
+  row.className = 'ex-plan-row';
+  row.dataset.ri = ri;
+  row.style.cssText = 'display:grid;grid-template-columns:24px 1fr 56px 72px 32px;gap:6px;align-items:center;margin-bottom:6px;';
+  row.innerHTML = `
+    <span class="drag-handle" style="color:var(--muted);font-size:18px;line-height:1;text-align:center;cursor:grab;user-select:none;">⠿</span>
+    <div style="position:relative;">
+      <input type="text" class="form-control ex-plan-input" value="${name.replace(/"/g,'&quot;')}"
+        placeholder="Exercise name..."
+        autocomplete="off"
+        oninput="filterPlanDrop(this, ${ri})"
+        onfocus="showPlanDrop(this, ${ri})"
+        onblur="hidePlanDrop(${ri})"
+        style="font-size:13px;padding:6px 10px;"/>
+      <input type="hidden" class="ex-plan-id" name="exercises[${ri}][exercise_id]" value="${exerciseId}"/>
+      <input type="hidden" name="exercises[${ri}][name]" class="ex-plan-name-hidden" value="${name.replace(/"/g,'&quot;')}"/>
+      <div id="plan-drop-${ri}" onmousedown="event.preventDefault()" onclick="pickPlanEx(event.target, ${ri})"
+        style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:200;
+               background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+               max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
+    </div>
+    <input type="number" class="form-control" name="exercises[${ri}][sets]" value="${sets}"
+      min="1" max="20" placeholder="Sets" style="font-size:13px;padding:6px 8px;text-align:center;"/>
+    <input type="text" class="form-control" name="exercises[${ri}][reps]" value="${reps}"
+      placeholder="Reps" style="font-size:13px;padding:6px 8px;text-align:center;"
+      title="e.g. 8, 8-10, AMRAP"/>
+    <button type="button" onclick="this.closest('.ex-plan-row').remove()"
+      style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+  `;
+  document.getElementById('ex-rows-container').appendChild(row);
+}
+
+function showPlanDrop(input, ri) {
+  const drop = document.getElementById(`plan-drop-${ri}`);
+  drop.innerHTML = buildExDropdown(input.value);
+  drop.style.display = 'block';
+}
+
+function filterPlanDrop(input, ri) {
+  const drop = document.getElementById(`plan-drop-${ri}`);
+  drop.innerHTML = buildExDropdown(input.value);
+  drop.style.display = 'block';
+  // Clear exercise_id when typing (user must re-select)
+  input.closest('div').querySelector('.ex-plan-id').value = '';
+}
+
+function hidePlanDrop(ri) {
+  setTimeout(() => {
+    const drop = document.getElementById(`plan-drop-${ri}`);
+    if (drop) drop.style.display = 'none';
+  }, 180);
+}
+
+function pickPlanEx(el, ri) {
+  const opt = el.closest('.ex-opt');
+  if (!opt) return;
+  const row = document.querySelector(`.ex-plan-row[data-ri="${ri}"]`);
+  row.querySelector('.ex-plan-input').value = opt.dataset.name;
+  row.querySelector('.ex-plan-id').value    = opt.dataset.id;
+  row.querySelector('.ex-plan-name-hidden').value = opt.dataset.name;
+  document.getElementById(`plan-drop-${ri}`).style.display = 'none';
+}
+
+// Keep hidden name in sync as user types
+document.addEventListener('input', function(e) {
+  if (e.target.classList.contains('ex-plan-input')) {
+    const row = e.target.closest('.ex-plan-row');
+    if (row) row.querySelector('.ex-plan-name-hidden').value = e.target.value;
+  }
+});
+
+// ── Form validation ─────────────────────────────────────────
+document.getElementById('edit-day-form').addEventListener('submit', function(e) {
+  let invalid = false;
+  document.querySelectorAll('.ex-plan-row').forEach(row => {
+    const name = row.querySelector('.ex-plan-input').value.trim();
+    const id   = row.querySelector('.ex-plan-id').value;
+    if (name && !id) {
+      row.querySelector('.ex-plan-input').style.borderColor = '#ff4466';
+      invalid = true;
+    } else {
+      row.querySelector('.ex-plan-input').style.borderColor = '';
+    }
+  });
+  if (invalid) {
+    e.preventDefault();
+    alert('Please select each exercise from the dropdown list.');
+  }
+});
+
+// ── Load existing exercises ─────────────────────────────────
+existingExercises.forEach(ex => {
+  if (typeof ex === 'string') {
+    // Legacy format: plain string like "Back Squat 4x8-10"
+    addExRow(ex, '', '', '');
+  } else {
+    // Structured format: {name, exercise_id, sets, reps}
+    addExRow(ex.name || '', ex.exercise_id || '', ex.sets || '', ex.reps || '');
+  }
+});
+if (existingExercises.length === 0) addExRow();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+Sortable.create(document.getElementById('ex-rows-container'), {
+  handle: '.drag-handle',
+  animation: 150,
+});
+</script>
+<script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
 {% endblock %}

@@ -32,6 +32,8 @@ class Exercise(db.Model):
     name         = db.Column(db.String(100), nullable=False, unique=True)
     muscle_group = db.Column(db.String(50))
     category     = db.Column(db.String(50), default='strength')
+    # unit_type controls default input mode: 'reps' | 'seconds' | 'reps_weight'
+    unit_type    = db.Column(db.String(12), default='reps')
     created_at   = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -67,6 +69,7 @@ class WorkoutSet(db.Model):
     weight_kg     = db.Column(db.Numeric(6, 2))
     weight_lbs    = db.Column(db.Numeric(6, 2))
     reps          = db.Column(db.Integer)
+    duration_s    = db.Column(db.Integer)
     steps         = db.Column(db.Integer)
     distance_m    = db.Column(db.Numeric(7, 1))
     assist_weight = db.Column(db.Numeric(6, 2))

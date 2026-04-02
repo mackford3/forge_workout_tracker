@@ -97,7 +97,7 @@
 
   <div id="circuit-exercises-container"></div>
 
-  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;" onclick="addExercise()">
+  <button type="button" class="btn btn-secondary btn-full" style="margin-bottom:16px;border-style:dashed;" onclick="addExercise()">
     + Add Exercise
   </button>
 
@@ -111,6 +111,13 @@
   </button>
 </form>
 
+<style>
+.circuit-ex-card .circuit-body { overflow:hidden; }
+.circuit-ex-card.collapsed .circuit-body { display:none; }
+.drag-handle { cursor:grab; user-select:none; }
+.drag-handle:active { cursor:grabbing; }
+.sortable-ghost { opacity:0.35; }
+</style>
 <script>
   let exIdx = 0;
 
@@ -120,64 +127,77 @@
     {% endfor %}
   ];
 
+  function toggleCircuitCollapse(card) {
+    card.classList.toggle('collapsed');
+    card.querySelector('.collapse-btn').textContent = card.classList.contains('collapsed') ? '▸' : '▾';
+  }
+
   function addExercise() {
     const unit = document.getElementById('global-unit').value;
     const idx  = exIdx++;
     const row  = document.createElement('div');
-    row.className = 'set-row card card-sm';
-    row.style.cssText = 'margin-bottom:8px;position:relative;';
+    row.className = 'circuit-ex-card card card-sm';
+    row.style.cssText = 'margin-bottom:8px;';
     row.innerHTML = `
-      <button type="button" onclick="removeRow(this)"
-        style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
-      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">Exercise ${idx + 1}</div>
-      <div class="form-group" style="margin-bottom:8px;">
-        <label class="form-label">Exercise</label>
-        <div data-exercise-wrap>
-          <input type="text" class="form-control ex-search-input"
-                 placeholder="Search exercises..." autocomplete="off"/>
-          <input type="hidden" class="exercise-id-input"
-                 name="exercises[${idx}][exercise_id]" required/>
-        </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span class="drag-handle" style="color:var(--muted);font-size:18px;line-height:1;padding:0 2px;flex-shrink:0;" title="Drag to reorder">⠿</span>
+        <div class="circuit-ex-label" style="flex:1;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Exercise ${idx + 1}</div>
+        <button type="button" class="collapse-btn" onclick="toggleCircuitCollapse(this.closest('.circuit-ex-card'))"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;">▾</button>
+        <button type="button" onclick="this.closest('.circuit-ex-card').remove()"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 2px;">✕</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-        <div>
-          <label class="form-label">Reps</label>
-          <input class="form-control" type="number" name="exercises[${idx}][reps]" placeholder="10"/>
+      <div class="circuit-body">
+        <div class="form-group" style="margin-bottom:8px;">
+          <label class="form-label">Exercise</label>
+          <div data-exercise-wrap>
+            <input type="text" class="form-control ex-search-input"
+                   placeholder="Search exercises..." autocomplete="off"/>
+            <input type="hidden" class="exercise-id-input"
+                   name="exercises[${idx}][exercise_id]" required/>
+          </div>
         </div>
-        <div>
-          <label class="form-label">Weight</label>
-          <input class="form-control" type="number" step="0.5" name="exercises[${idx}][weight]" placeholder="0"/>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div><label class="form-label">Reps</label>
+            <input class="form-control" type="number" name="exercises[${idx}][reps]" placeholder="10"/></div>
+          <div><label class="form-label">Weight</label>
+            <input class="form-control" type="number" step="0.5" name="exercises[${idx}][weight]" placeholder="0"/></div>
+          <div><label class="form-label">Unit</label>
+            <select class="form-control unit-select" name="exercises[${idx}][unit]">
+              <option value="kg" ${unit==='kg'?'selected':''}>kg</option>
+              <option value="lbs" ${unit==='lbs'?'selected':''}>lbs</option>
+            </select></div>
         </div>
-        <div>
-          <label class="form-label">Unit</label>
-          <select class="form-control unit-select" name="exercises[${idx}][unit]">
-            <option value="kg" ${unit === 'kg' ? 'selected' : ''}>kg</option>
-            <option value="lbs" ${unit === 'lbs' ? 'selected' : ''}>lbs</option>
-          </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+          <div><label class="form-label">Duration (MM:SS)</label>
+            <input class="form-control" name="exercises[${idx}][duration]" placeholder="0:30"/></div>
+          <div><label class="form-label">Distance (m)</label>
+            <input class="form-control" type="number" name="exercises[${idx}][distance_m]" placeholder="200"/></div>
         </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-        <div>
-          <label class="form-label">Duration (MM:SS)</label>
-          <input class="form-control" name="exercises[${idx}][duration]" placeholder="0:30"/>
+        <div style="margin-top:8px;">
+          <label class="form-label">Notes</label>
+          <input class="form-control" name="exercises[${idx}][notes]" placeholder="Optional"/>
         </div>
-        <div>
-          <label class="form-label">Distance (m)</label>
-          <input class="form-control" type="number" name="exercises[${idx}][distance_m]" placeholder="200"/>
-        </div>
-      </div>
-      <div style="margin-top:8px;">
-        <label class="form-label">Notes</label>
-        <input class="form-control" name="exercises[${idx}][notes]" placeholder="Optional"/>
       </div>
     `;
     document.getElementById('circuit-exercises-container').appendChild(row);
-    new ExerciseSearch(row.querySelector('.ex-search-input'), EXERCISES,
-                       { hiddenInputEl: row.querySelector('.exercise-id-input') });
+    new ExerciseSearch(row.querySelector('.ex-search-input'), EXERCISES, {
+      hiddenInputEl: row.querySelector('.exercise-id-input'),
+      onSelect: (data) => {
+        if (data) row.querySelector('.circuit-ex-label').textContent = data.name;
+      },
+    });
   }
 
   function setUnit(unit) { document.querySelectorAll('.unit-select').forEach(s => s.value = unit); }
-  function removeRow(btn) { btn.closest('.set-row').remove(); }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script>
+Sortable.create(document.getElementById('circuit-exercises-container'), {
+  handle: '.drag-handle',
+  animation: 150,
+  ghostClass: 'sortable-ghost',
+});
 </script>
 <script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
 {% endblock %}

@@ -26,6 +26,14 @@
         <option value="plyometric" {{ 'selected' if ex.category == 'plyometric' }}>Plyometric</option>
       </select>
     </div>
+    <div class="form-group">
+      <label class="form-label">Default Tracking Unit</label>
+      <select class="form-control" name="unit_type">
+        <option value="reps" {{ 'selected' if (ex.unit_type or 'reps') == 'reps' }}>Reps (e.g. push-ups, pull-ups)</option>
+        <option value="reps_weight" {{ 'selected' if ex.unit_type == 'reps_weight' }}>Reps + Weight (e.g. bench press, Russian twists)</option>
+        <option value="seconds" {{ 'selected' if ex.unit_type == 'seconds' }}>Seconds (e.g. plank, wall sit)</option>
+      </select>
+    </div>
   </div>
   <button type="submit" class="btn btn-primary btn-full" style="font-size:18px;padding:16px;">Save Changes ✓</button>
 </form>
