@@ -21,7 +21,7 @@
   </div>
 </div>
 
-<form method="post">
+<form hx-post="" hx-swap="none">
   <input type="hidden" name="circuit_type" value="{{ circuit_type }}"/>
   <div class="card">
     <div class="form-group">
@@ -197,7 +197,22 @@ Sortable.create(document.getElementById('circuit-exercises-container'), {
   handle: '.drag-handle',
   animation: 150,
   ghostClass: 'sortable-ghost',
+  onStart: function() {
+    document.querySelectorAll('.circuit-ex-card').forEach(c => {
+      if (!c.classList.contains('collapsed')) {
+        c.dataset.wasExpanded = '1';
+        toggleCircuitCollapse(c);
+      }
+    });
+  },
+  onEnd: function() {
+    document.querySelectorAll('.circuit-ex-card[data-was-expanded="1"]').forEach(c => {
+      delete c.dataset.wasExpanded;
+      toggleCircuitCollapse(c);
+    });
+  },
 });
 </script>
 <script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
+<script src="{{ url_for('static', filename='js/draft_backup.js') }}" data-draft-key="forge_draft_circuit"></script>
 {% endblock %}

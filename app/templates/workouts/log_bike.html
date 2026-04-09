@@ -10,7 +10,7 @@
   </div>
 </div>
 
-<form method="post">
+<form hx-post="" hx-swap="none">
   <div class="card">
     <div class="form-group">
       <label class="form-label">Session Name</label>
@@ -114,4 +114,5 @@
     }
   });
 </script>
+<script src="{{ url_for('static', filename='js/draft_backup.js') }}" data-draft-key="forge_draft_bike"></script>
 {% endblock %}

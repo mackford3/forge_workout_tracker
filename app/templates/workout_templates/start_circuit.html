@@ -26,7 +26,7 @@
 <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">{{ tmpl.source }}</div>
 {% endif %}
 
-<form method="post" action="{{ url_for('workouts.log_circuit') }}">
+<form hx-post="{{ url_for('workouts.log_circuit') }}" hx-swap="none">
   <input type="hidden" name="circuit_type" value="{{ data.get('circuit_type', 'circuit') }}"/>
 
   <div class="card" style="margin-bottom:10px;">
@@ -430,6 +430,21 @@ Sortable.create(document.getElementById('circuit-exercises-container'), {
   handle: '.drag-handle',
   animation: 150,
   ghostClass: 'sortable-ghost',
+  onStart: function() {
+    document.querySelectorAll('.circuit-ex-card').forEach(c => {
+      if (!c.classList.contains('collapsed')) {
+        c.dataset.wasExpanded = '1';
+        toggleCircuitCollapse(c);
+      }
+    });
+  },
+  onEnd: function() {
+    document.querySelectorAll('.circuit-ex-card[data-was-expanded="1"]').forEach(c => {
+      delete c.dataset.wasExpanded;
+      toggleCircuitCollapse(c);
+    });
+  },
 });
 </script>
+<script src="{{ url_for('static', filename='js/draft_backup.js') }}" data-draft-key="forge_draft_circuit"></script>
 {% endblock %}

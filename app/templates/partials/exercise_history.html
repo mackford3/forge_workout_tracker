@@ -8,6 +8,7 @@
   margin-bottom: 10px;
   font-size: 13px;
 ">
+  <!-- Last Time -->
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
     <span style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted);">
       Last time · {{ last_date.strftime('%b %-d') }}
@@ -42,5 +43,59 @@
     </div>
     {% endfor %}
   </div>
+
+  {% if best_set and best_1rm %}
+  <!-- Personal Best -->
+  <div style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border);">
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+      <span style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted);">
+        Personal Best
+      </span>
+      <span style="font-family:'DM Mono',monospace; font-size:11px; background:#f59e0b; color:#000; padding:2px 7px; border-radius:4px; font-weight:700;">
+        Est 1RM {{ best_1rm }} lbs
+      </span>
+    </div>
+    <div style="
+      background: var(--surface);
+      border: 1px solid #f59e0b44;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      display: inline-block;
+    ">
+      <span style="color:var(--text); font-weight:600;">{{ best_set.weight_lbs | int }}</span>
+      <span style="color:var(--muted); font-size:10px;">lbs</span>
+      <span style="color:var(--muted);"> × </span>
+      <span style="color:#f59e0b; font-weight:600;">{{ best_set.reps }}</span>
+      <span style="color:var(--muted); font-size:10px;"> reps</span>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if recent_sessions and recent_sessions | length > 1 %}
+  <!-- Recent Sessions -->
+  <details style="margin-top:8px;">
+    <summary style="font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); cursor:pointer; user-select:none;">
+      Recent Sessions ({{ recent_sessions | length }})
+    </summary>
+    <div style="margin-top:6px; display:flex; flex-direction:column; gap:4px;">
+      {% for sess in recent_sessions %}
+      <div style="display:flex; align-items:center; justify-content:space-between; font-family:'DM Mono',monospace; font-size:12px; padding:4px 8px; background:var(--surface); border-radius:4px;">
+        <span style="color:var(--muted);">{{ sess.date.strftime('%b %-d') }}</span>
+        <span>
+          {% if sess.set.weight_lbs %}
+          <span style="color:var(--text); font-weight:600;">{{ sess.set.weight_lbs | int }}</span>
+          <span style="color:var(--muted); font-size:10px;">lbs</span>
+          <span style="color:var(--muted);"> × </span>
+          {% endif %}
+          <span style="color:var(--accent); font-weight:600;">{{ sess.set.reps or '?' }}</span>
+          <span style="color:var(--muted); font-size:10px;">reps</span>
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
 </div>
 {% endif %}

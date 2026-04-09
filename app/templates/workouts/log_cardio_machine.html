@@ -17,7 +17,7 @@
   </div>
 </div>
 
-<form method="post" action="{{ url_for('workouts.log_cardio_machine') }}">
+<form hx-post="{{ url_for('workouts.log_cardio_machine') }}" hx-swap="none">
   <div class="card" style="margin-bottom:12px;">
     <div class="form-group">
       <label class="form-label">Session Name</label>
@@ -202,4 +202,5 @@
     }
   });
 </script>
+<script src="{{ url_for('static', filename='js/draft_backup.js') }}" data-draft-key="forge_draft_cardio"></script>
 {% endblock %}

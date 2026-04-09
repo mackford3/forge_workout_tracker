@@ -10,6 +10,15 @@ from ..utils import lbs_to_kg
 
 workouts_bp = Blueprint('workouts', __name__)
 
+
+def _htmx_or_redirect(url):
+    """Return HX-Redirect for htmx requests, or a normal redirect otherwise."""
+    if request.headers.get('HX-Request'):
+        resp = Response('', 200)
+        resp.headers['HX-Redirect'] = url
+        return resp
+    return redirect(url)
+
 LOCATION_CHOICES = [
     ('gym',     '🏋️ Gym'),
     ('home',    '🏠 Home'),
@@ -199,10 +208,10 @@ def log_strength():
                 comp.status     = 'done'
                 comp.done_date  = workout.completed_at.date()
                 db.session.commit()
-                return redirect(url_for('program.week',
+                return _htmx_or_redirect(url_for('program.week',
                     program_id=day.program_id, week_num=day.week_number))
 
-        return redirect(url_for('workouts.view', workout_id=workout.id))
+        return _htmx_or_redirect(url_for('workouts.view', workout_id=workout.id))
 
     return render_template('workouts/log_strength.html', exercises=exercises,
                            locations=LOCATION_CHOICES)
@@ -258,7 +267,7 @@ def log_cardio_machine():
             rpe        = float(f[f'cardio[{j}][rpe]'])     if f.get(f'cardio[{j}][rpe]')       else None,
         ))
     db.session.commit()
-    return redirect(url_for('workouts.view', workout_id=workout.id))
+    return _htmx_or_redirect(url_for('workouts.view', workout_id=workout.id))
 
 
 # ── Log Run ────────────────────────────────────────────────
@@ -334,7 +343,7 @@ def log_run():
             ))
 
         db.session.commit()
-        return redirect(url_for('workouts.view', workout_id=workout.id))
+        return _htmx_or_redirect(url_for('workouts.view', workout_id=workout.id))
 
     return render_template('workouts/log_run.html', locations=LOCATION_CHOICES)
 
@@ -375,7 +384,7 @@ def log_bike():
         )
         db.session.add(run)
         db.session.commit()
-        return redirect(url_for('workouts.view', workout_id=workout.id))
+        return _htmx_or_redirect(url_for('workouts.view', workout_id=workout.id))
 
     environment = request.args.get('environment', 'indoor')
     return render_template('workouts/log_bike.html',
@@ -429,7 +438,7 @@ def log_mobility():
         )
         db.session.add(workout)
         db.session.commit()
-        return redirect(url_for('workouts.view', workout_id=workout.id))
+        return _htmx_or_redirect(url_for('workouts.view', workout_id=workout.id))
     return render_template('workouts/log_mobility.html', locations=LOCATION_CHOICES)
 
 
@@ -471,7 +480,7 @@ def log_hyrox_race():
 
         _save_hyrox_stations(result.id, f)
         db.session.commit()
-        return redirect(url_for('workouts.view', workout_id=workout.id))
+        return _htmx_or_redirect(url_for('workouts.view', workout_id=workout.id))
 
     race_type = request.args.get('race_type', 'singles')
     return render_template('workouts/log_hyrox.html',
@@ -551,10 +560,10 @@ def log_hyrox_training():
                 comp.status     = 'done'
                 comp.done_date  = workout.completed_at.date()
                 db.session.commit()
-                return redirect(url_for('program.week',
+                return _htmx_or_redirect(url_for('program.week',
                     program_id=day.program_id, week_num=day.week_number))
 
-        return redirect(url_for('workouts.view', workout_id=workout.id))
+        return _htmx_or_redirect(url_for('workouts.view', workout_id=workout.id))
 
     program_day_id = request.args.get('program_day_id')
     return render_template('workouts/log_hyrox.html',
@@ -664,7 +673,7 @@ def log_circuit():
             i += 1
 
         db.session.commit()
-        return redirect(url_for('workouts.view', workout_id=workout.id))
+        return _htmx_or_redirect(url_for('workouts.view', workout_id=workout.id))
 
     return render_template('workouts/log_circuit.html', exercises=exercises,
                            circuit_type=circuit_type, locations=LOCATION_CHOICES)
@@ -974,7 +983,7 @@ def edit(workout_id):
                     i += 1
 
         db.session.commit()
-        return redirect(url_for('workouts.view', workout_id=workout.id))
+        return _htmx_or_redirect(url_for('workouts.view', workout_id=workout.id))
 
     # GET — render edit form
     return render_template('workouts/edit.html', workout=workout, exercises=exercises,
@@ -1017,7 +1026,49 @@ def htmx_exercise_history():
                 WorkoutSet.skipped == False) \
         .scalar()
 
+    # ── Personal best (best estimated 1RM via Epley) ──────
+    all_sets = (
+        db.session.query(WorkoutSet)
+        .filter(WorkoutSet.exercise_id == ex_id, WorkoutSet.skipped == False,
+                WorkoutSet.weight_lbs.isnot(None), WorkoutSet.reps.isnot(None))
+        .all()
+    )
+    best_set = None
+    best_1rm = 0.0
+    for s in all_sets:
+        r = s.reps or 1
+        est = float(s.weight_lbs) * (1 + r / 30.0)
+        if est > best_1rm:
+            best_1rm = est
+            best_set = s
+
+    # ── Recent sessions (last 5 unique workouts) ──────────
+    recent_workout_ids = (
+        db.session.query(WorkoutSet.workout_id)
+        .join(Workout)
+        .filter(WorkoutSet.exercise_id == ex_id, WorkoutSet.skipped == False)
+        .group_by(WorkoutSet.workout_id, Workout.completed_at)
+        .order_by(Workout.completed_at.desc())
+        .limit(5)
+        .all()
+    )
+    recent_sessions = []
+    for (wid,) in recent_workout_ids:
+        w = Workout.query.get(wid)
+        top = (
+            db.session.query(WorkoutSet)
+            .filter(WorkoutSet.workout_id == wid, WorkoutSet.exercise_id == ex_id,
+                    WorkoutSet.skipped == False)
+            .order_by(WorkoutSet.weight_lbs.desc().nullslast(), WorkoutSet.reps.desc().nullslast())
+            .first()
+        )
+        if top:
+            recent_sessions.append({'date': w.completed_at, 'set': top})
+
     return render_template('partials/exercise_history.html',
                            last_sets=last_sets,
                            pr_lbs=float(pr_lbs) if pr_lbs else None,
-                           last_date=last_date)
+                           last_date=last_date,
+                           best_set=best_set,
+                           best_1rm=round(best_1rm) if best_1rm else None,
+                           recent_sessions=recent_sessions)
