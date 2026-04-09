@@ -11,7 +11,7 @@
   Week {{ day.week_number }} · {{ day.day_of_week }} · {{ program.name }}
 </div>
 
-<form method="post" action="{{ url_for('workouts.log_strength') }}" id="strength-form">
+<form id="strength-form" hx-post="{{ url_for('workouts.log_strength') }}" hx-swap="none">
   <input type="hidden" name="program_day_id" value="{{ day.id }}"/>
 
   <!-- Session info -->
@@ -83,6 +83,7 @@
 .sortable-ghost { opacity:0.35; }
 </style>
 
+<script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
 <script>
 const allExercises = [
   {% for ex in all_exercises %}
@@ -98,86 +99,6 @@ const programExercises = [
 
 let globalSetIndex = 0, globalCardioIndex = 0, exerciseCount = 0;
 
-// ── Exercise dropdown ──────────────────────────────────────
-function buildExDropdown(query) {
-  const q = query.toLowerCase().trim();
-  const filtered = q
-    ? allExercises.filter(ex => ex.name.toLowerCase().includes(q) || ex.group.toLowerCase().includes(q))
-    : allExercises.slice(0, 60);
-  let html = '', curGroup = null;
-  filtered.forEach(ex => {
-    if (ex.group !== curGroup) {
-      html += `<div style="padding:5px 14px 3px;font-size:10px;font-weight:700;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;background:var(--surface);position:sticky;top:0;">${ex.group || 'Other'}</div>`;
-      curGroup = ex.group;
-    }
-    html += `<div class="ex-opt" data-id="${ex.id}" data-name="${ex.name.replace(/"/g,'&quot;')}"
-      style="padding:10px 14px;cursor:pointer;font-size:14px;"
-      onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background=''">${ex.name}</div>`;
-  });
-  const hasExact = allExercises.some(ex => ex.name.toLowerCase() === q);
-  if (q && !hasExact) {
-    html += `<div class="ex-opt" data-id="__add__" data-name="${q.replace(/"/g,'&quot;')}"
-      style="padding:10px 14px;cursor:pointer;font-size:13px;color:var(--accent);border-top:1px solid var(--border);"
-      onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background=''">
-      ➕ Add "<strong>${q}</strong>" to library</div>`;
-  }
-  return html || '<div style="padding:10px 14px;color:var(--muted);font-size:13px;">No matches</div>';
-}
-
-function showExDrop(input, exIdx) {
-  const drop = document.getElementById(`ex-drop-${exIdx}`);
-  drop.innerHTML = buildExDropdown(input.value);
-  drop.style.display = 'block';
-}
-
-function filterExDrop(input, exIdx) {
-  const drop = document.getElementById(`ex-drop-${exIdx}`);
-  drop.innerHTML = buildExDropdown(input.value);
-  drop.style.display = 'block';
-  const block = input.closest('.exercise-block');
-  block.querySelector('.exercise-id-input').value = '';
-  syncExerciseToSets(parseInt(block.dataset.exIdx));
-  updateBlockSummary(exIdx);
-}
-
-function hideExDrop(exIdx) {
-  setTimeout(() => { const d = document.getElementById(`ex-drop-${exIdx}`); if (d) d.style.display = 'none'; }, 180);
-}
-
-function pickExercise(dropEl, exIdx) {
-  const opt = dropEl.closest('.ex-opt');
-  if (!opt) return;
-  const id = opt.dataset.id, name = opt.dataset.name;
-  const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
-  document.getElementById(`ex-drop-${exIdx}`).style.display = 'none';
-  if (id === '__add__') { createExerciseInline(name, exIdx); return; }
-  block.querySelector('.ex-search-input').value = name;
-  block.querySelector('.exercise-id-input').value = id;
-  block.style.borderColor = '';
-  block.querySelector('.ex-search-input').style.borderColor = '';
-  block.querySelector('.ex-validate-msg')?.remove();
-  syncExerciseToSets(exIdx);
-  updateBlockSummary(exIdx);
-  const exData = allExercises.find(e => e.id == id);
-  if (exData?.unitType) setExerciseUnit(block, exIdx, exData.unitType);
-  loadHistory(id, exIdx);
-}
-
-function createExerciseInline(name, exIdx) {
-  const block = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
-  ExerciseSearch.showCreateModal(name, allExercises, block, (data) => {
-    allExercises.push({ id: data.id, name: data.name, group: data.muscle_group || '', unitType: data.unit_type || 'reps' });
-    block.querySelector('.ex-search-input').value = data.name;
-    block.querySelector('.exercise-id-input').value = data.id;
-    block.style.borderColor = '';
-    block.querySelector('.ex-search-input').style.borderColor = '';
-    block.querySelector('.ex-validate-msg')?.remove();
-    syncExerciseToSets(exIdx);
-    updateBlockSummary(exIdx);
-    loadHistory(data.id, exIdx);
-  });
-}
-
 // ── Reps / Seconds unit toggle ─────────────────────────────
 const UNIT_CYCLE  = ['reps', 'seconds', 'reps_weight'];
 const UNIT_LABELS = { reps: 'Reps', seconds: 'Secs', reps_weight: 'Reps+Wt' };
@@ -186,13 +107,14 @@ function setExerciseUnit(block, exIdx, unitType) {
   block.dataset.unitType = unitType;
   const btn = block.querySelector('.unit-toggle-btn');
   if (btn) btn.textContent = UNIT_LABELS[unitType] || 'Reps';
-  const isSeconds = unitType === 'seconds';
+  const isSeconds  = unitType === 'seconds';
+  const showWeight = unitType === 'reps_weight';
   block.querySelectorAll('.set-card').forEach(card => {
     card.querySelector('.reps-label').textContent  = isSeconds ? 'Seconds' : 'Reps';
     card.querySelector('.reps-input').style.display = isSeconds ? 'none' : '';
     card.querySelector('.dur-input').style.display  = isSeconds ? '' : 'none';
-    card.querySelector('.weight-row').style.display = isSeconds ? 'none' : '';
-    card.querySelector('.unit-row').style.display   = isSeconds ? 'none' : '';
+    card.querySelector('.weight-row').style.display = showWeight ? '' : 'none';
+    card.querySelector('.unit-row').style.display   = showWeight ? '' : 'none';
   });
 }
 
@@ -205,9 +127,8 @@ function cycleExerciseUnit(block, exIdx) {
 function toggleCollapse(block) {
   const wasCollapsed = block.classList.contains('collapsed');
   block.classList.toggle('collapsed');
-  const btn = block.querySelector('.collapse-btn');
-  btn.textContent = block.classList.contains('collapsed') ? '▸' : '▾';
-  // Show ✓ chip when collapsing (if block has sets filled)
+  const ind = block.querySelector('.collapse-indicator');
+  if (ind) ind.textContent = block.classList.contains('collapsed') ? '▸' : '▾';
   const doneEl = block.querySelector('.summary-done');
   if (doneEl) doneEl.style.display = (!wasCollapsed) ? '' : 'none';
 }
@@ -245,20 +166,21 @@ function addExercise(selectedExerciseId = '', labelHint = '', insertAfterBlock =
     <!-- Always-visible header -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
       <span class="drag-handle" style="color:var(--muted);font-size:18px;line-height:1;padding:0 2px;flex-shrink:0;" title="Drag to reorder">⠿</span>
-      <div style="flex:1;min-width:0;">
-        <div class="summary-name" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);">${selectedName || (labelHint ? labelHint : 'New Exercise')}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:1px;display:flex;gap:6px;align-items:center;">
+      <div style="flex:1;min-width:0;cursor:pointer;-webkit-tap-highlight-color:transparent;" onclick="toggleCollapse(this.closest('.exercise-block'))">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="collapse-indicator" style="color:var(--muted);font-size:13px;flex-shrink:0;">▾</span>
+          <div class="summary-name" style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);">${selectedName || (labelHint ? labelHint : 'New Exercise')}</div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px;display:flex;gap:6px;align-items:center;padding-left:19px;">
           <span class="summary-sets"></span>
           <span class="summary-done" style="display:none;color:var(--accent);">✓</span>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
         <button type="button" class="unit-toggle-btn" onclick="cycleExerciseUnit(this.closest('.exercise-block'), ${exIdx})"
-          style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-size:10px;padding:2px 6px;line-height:1.6;white-space:nowrap;">Reps</button>
-        <button type="button" class="collapse-btn" onclick="toggleCollapse(this.closest('.exercise-block'))"
-          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;" title="Collapse">▾</button>
+          style="background:none;border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;font-size:10px;padding:4px 8px;line-height:1.6;white-space:nowrap;">Reps</button>
         <button type="button" onclick="this.closest('.exercise-block').remove()"
-          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 2px;">✕</button>
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:4px 4px;">✕</button>
       </div>
     </div>
 
@@ -267,17 +189,10 @@ function addExercise(selectedExerciseId = '', labelHint = '', insertAfterBlock =
       ${labelHint ? `<div style="font-size:10px;font-family:'DM Mono',monospace;margin-bottom:8px;${matchFailed ? 'color:#ff9800;' : 'color:var(--muted);'}">Program: ${labelHint}${matchFailed ? ' ⚠ not found — select manually' : ''}</div>` : ''}
       <div class="form-group" style="margin-bottom:8px;">
         <label class="form-label">Exercise</label>
-        <div style="position:relative;">
+        <div data-exercise-wrap style="position:relative;">
           <input type="text" class="form-control ex-search-input" value="${selectedName}"
-            placeholder="Type to search exercise..." autocomplete="off"
-            oninput="filterExDrop(this, ${exIdx})"
-            onfocus="showExDrop(this, ${exIdx})"
-            onblur="hideExDrop(${exIdx})"/>
+            placeholder="Search exercises..." autocomplete="off"/>
           <input type="hidden" class="exercise-id-input" value="${selectedExerciseId || ''}"/>
-          <div id="ex-drop-${exIdx}" onmousedown="event.preventDefault()" onclick="pickExercise(event.target, ${exIdx})"
-            style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:200;
-                   background:var(--surface2);border:1px solid var(--border);border-radius:8px;
-                   max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.4);"></div>
         </div>
       </div>
       <div id="history-${exIdx}" style="margin-bottom:4px;"></div>
@@ -295,26 +210,47 @@ function addExercise(selectedExerciseId = '', labelHint = '', insertAfterBlock =
   } else {
     document.getElementById('exercises-container').appendChild(block);
   }
+  new ExerciseSearch(block.querySelector('.ex-search-input'), allExercises, {
+    hiddenInputEl: block.querySelector('.exercise-id-input'),
+    onSelect: (data) => {
+      if (!data) { syncExerciseToSets(exIdx); updateBlockSummary(exIdx); return; }
+      block.style.borderColor = '';
+      block.querySelector('.ex-search-input').style.borderColor = '';
+      block.querySelector('.ex-validate-msg')?.remove();
+      syncExerciseToSets(exIdx);
+      updateBlockSummary(exIdx);
+      const exData = allExercises.find(e => e.id == data.id);
+      if (exData?.unitType) setExerciseUnit(block, exIdx, exData.unitType);
+      loadHistory(data.id, exIdx);
+    },
+  });
 
   addSet(exIdx);
   updateBlockSummary(exIdx);
   if (selectedExerciseId) loadHistory(selectedExerciseId, exIdx);
 }
 
-async function loadHistory(exerciseId, exIdx) {
+function loadHistory(exerciseId, exIdx) {
   const container = document.getElementById(`history-${exIdx}`);
   if (!exerciseId) { container.innerHTML = ''; return; }
   container.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0;">Loading...</div>';
-  const res  = await fetch(`/workouts/htmx/exercise-history?exercise_id=${exerciseId}`);
-  const html = await res.text();
-  container.innerHTML = html;
-  const prMatch = html.match(/data-last-weight="([\d.]+)"/);
-  if (prMatch) {
-    document.getElementById(`sets-row-${exIdx}`)?.querySelectorAll('input[name*="[weight]"]').forEach(inp => {
-      if (!inp.value) inp.value = prMatch[1];
-    });
-  }
+  container.dataset.exIdx = exIdx;
+  htmx.ajax('GET', `/workouts/htmx/exercise-history?exercise_id=${exerciseId}`, {target: container, swap: 'innerHTML'});
 }
+document.addEventListener('htmx:afterSwap', function(e) {
+  const container = e.detail.target;
+  if (!container.id?.startsWith('history-')) return;
+  const exIdx = container.dataset.exIdx;
+  const strip = container.querySelector('.ex-history-strip');
+  if (strip && exIdx != null) {
+    const lastWeight = strip.dataset.lastWeight;
+    if (lastWeight) {
+      document.getElementById(`sets-row-${exIdx}`)?.querySelectorAll('input[name*="[weight]"]').forEach(inp => {
+        if (!inp.value) inp.value = lastWeight;
+      });
+    }
+  }
+});
 
 // ── Set management ─────────────────────────────────────────
 function addSet(exIdx) {
@@ -324,7 +260,9 @@ function addSet(exIdx) {
   const setCards = row.querySelectorAll('.set-card');
   const setNum   = setCards.length + 1;
   const exBlock  = document.querySelector(`.exercise-block[data-ex-idx="${exIdx}"]`);
-  const isSeconds = (exBlock?.dataset.unitType || 'reps') === 'seconds';
+  const unitType  = exBlock?.dataset.unitType || 'reps';
+  const isSeconds = unitType === 'seconds';
+  const showWeight = unitType === 'reps_weight';
 
   let prevWeight = '';
   if (setCards.length > 0) {
@@ -340,12 +278,12 @@ function addSet(exIdx) {
       style="position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;">✕</button>
     <div class="set-label" style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;text-align:center;">Set ${setNum}</div>
     <input type="hidden" class="set-number-input" name="sets[${idx}][set_number]" value="${setNum}"/>
-    <div class="weight-row" style="margin-bottom:6px;${isSeconds ? 'display:none;' : ''}">
+    <div class="weight-row" style="margin-bottom:6px;${showWeight ? '' : 'display:none;'}">
       <label class="form-label" style="font-size:10px;">Weight</label>
       <input class="form-control" type="number" step="0.5" min="0" name="sets[${idx}][weight]"
         placeholder="0" value="${prevWeight}" style="text-align:center;padding:6px 4px;font-size:16px;font-weight:600;"/>
     </div>
-    <div class="unit-row" style="margin-bottom:6px;${isSeconds ? 'display:none;' : ''}">
+    <div class="unit-row" style="margin-bottom:6px;${showWeight ? '' : 'display:none;'}">
       <select class="form-control unit-select" name="sets[${idx}][unit]" style="padding:4px 6px;font-size:12px;">
         <option value="lbs" ${unit==='lbs'?'selected':''}>lbs</option>
         <option value="kg"  ${unit==='kg' ?'selected':''}>kg</option>
@@ -429,7 +367,21 @@ Sortable.create(document.getElementById('exercises-container'), {
   handle: '.drag-handle',
   animation: 150,
   ghostClass: 'sortable-ghost',
+  onStart: function() {
+    document.querySelectorAll('.exercise-block').forEach(b => {
+      if (!b.classList.contains('collapsed')) {
+        b.dataset.wasExpanded = '1';
+        toggleCollapse(b);
+      }
+    });
+  },
+  onEnd: function() {
+    document.querySelectorAll('.exercise-block[data-was-expanded="1"]').forEach(b => {
+      delete b.dataset.wasExpanded;
+      toggleCollapse(b);
+    });
+  },
 });
 </script>
-<script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
+<script src="{{ url_for('static', filename='js/draft_backup.js') }}" data-draft-key="forge_draft_strength"></script>
 {% endblock %}

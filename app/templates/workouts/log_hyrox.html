@@ -26,7 +26,7 @@
   {% endif %}
 </div>
 
-<form method="post">
+<form hx-post="" hx-swap="none">
   {% if not is_training %}
   <input type="hidden" name="race_type" value="{{ race_type or 'singles' }}"/>
   {% endif %}
@@ -522,4 +522,5 @@
     list.appendChild(seg);
   }
 </script>
+<script src="{{ url_for('static', filename='js/draft_backup.js') }}" data-draft-key="forge_draft_hyrox"></script>
 {% endblock %}

@@ -1,8 +1,16 @@
-from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session
+from flask import Blueprint, render_template, request, redirect, url_for, jsonify, session, Response
 from ..models import db, PremadeWorkout, PremadeStation, PremadeResult, PremadeStationResult, Workout
 from datetime import datetime
 
 premade_bp = Blueprint('premade', __name__)
+
+
+def _htmx_or_redirect(url):
+    if request.headers.get('HX-Request'):
+        resp = Response('', 200)
+        resp.headers['HX-Redirect'] = url
+        return resp
+    return redirect(url)
 
 
 def _fmt_time(seconds):
@@ -121,7 +129,7 @@ def log(pw_id):
             ))
 
         db.session.commit()
-        return redirect(url_for('premade.view', pw_id=pw_id))
+        return _htmx_or_redirect(url_for('premade.view', pw_id=pw_id))
 
     last_result = (PremadeResult.query
                    .filter_by(premade_workout_id=pw_id)
