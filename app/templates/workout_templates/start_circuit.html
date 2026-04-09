@@ -345,7 +345,8 @@
 
   function toggleCircuitCollapse(card) {
     card.classList.toggle('collapsed');
-    card.querySelector('.collapse-btn').textContent = card.classList.contains('collapsed') ? '▸' : '▾';
+    const ind = card.querySelector('.collapse-indicator');
+    if (ind) ind.textContent = card.classList.contains('collapsed') ? '▸' : '▾';
   }
 
   function addExercise() {
@@ -360,11 +361,14 @@
     row.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <span class="drag-handle" style="color:var(--muted);font-size:18px;line-height:1;padding:0 2px;flex-shrink:0;" title="Drag to reorder">⠿</span>
-        <div class="circuit-ex-label" style="flex:1;font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Exercise ${idx + 1}</div>
-        <button type="button" class="collapse-btn" onclick="toggleCircuitCollapse(this.closest('.circuit-ex-card'))"
-          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;">▾</button>
+        <div style="flex:1;min-width:0;cursor:pointer;-webkit-tap-highlight-color:transparent;" onclick="toggleCircuitCollapse(this.closest('.circuit-ex-card'))">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="collapse-indicator" style="color:var(--muted);font-size:13px;flex-shrink:0;">▾</span>
+            <div class="circuit-ex-label" style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Exercise ${idx + 1}</div>
+          </div>
+        </div>
         <button type="button" onclick="this.closest('.circuit-ex-card').remove()"
-          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 2px;">✕</button>
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:4px 4px;">✕</button>
       </div>
       <div class="circuit-body">
         <div class="form-group" style="margin-bottom:8px;">

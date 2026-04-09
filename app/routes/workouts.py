@@ -439,7 +439,8 @@ def log_mobility():
         db.session.add(workout)
         db.session.commit()
         return _htmx_or_redirect(url_for('workouts.view', workout_id=workout.id))
-    return render_template('workouts/log_mobility.html', locations=LOCATION_CHOICES)
+    exercises = Exercise.query.order_by(Exercise.name).all()
+    return render_template('workouts/log_mobility.html', locations=LOCATION_CHOICES, exercises=exercises)
 
 
 # ── Hyrox Start (selection page) ───────────────────────────

@@ -71,7 +71,14 @@
   </button>
 </form>
 
+<script src="{{ url_for('static', filename='js/exercise_search.js') }}"></script>
 <script>
+  const allExercises = [
+    {% for ex in exercises %}
+    { id: {{ ex.id }}, name: "{{ ex.name }}", group: "{{ ex.muscle_group or '' }}", unitType: "{{ ex.unit_type or 'reps' }}" },
+    {% endfor %}
+  ];
+
   let exRowIdx = 0;
 
   function addExerciseRow(name = '', duration = '') {
@@ -79,9 +86,12 @@
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;';
     row.innerHTML = `
-      <input class="form-control" type="text" name="exercises[${idx}][name]"
-             placeholder="e.g. Downward Dog, Pigeon Pose…" value="${name}"
-             style="flex:1;"/>
+      <div data-exercise-wrap style="position:relative;flex:1;">
+        <input class="form-control ex-search-input" type="text"
+               placeholder="Search exercises..." value="${name}" autocomplete="off"/>
+        <input type="hidden" class="exercise-id-input" name="exercises[${idx}][exercise_id]"/>
+        <input type="hidden" name="exercises[${idx}][name]" class="exercise-name-input" value="${name}"/>
+      </div>
       <input class="form-control" type="text" name="exercises[${idx}][duration]"
              placeholder="e.g. 60s, 5 min" value="${duration}"
              style="width:90px;flex-shrink:0;font-size:13px;"/>
@@ -89,7 +99,16 @@
               style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;flex-shrink:0;padding:0 4px;">✕</button>
     `;
     document.getElementById('exercises-list').appendChild(row);
-    row.querySelector('input[name$="[name]"]').focus();
+    const searchInput = row.querySelector('.ex-search-input');
+    const nameInput = row.querySelector('.exercise-name-input');
+    new ExerciseSearch(searchInput, allExercises, {
+      hiddenInputEl: row.querySelector('.exercise-id-input'),
+      onSelect: (data) => {
+        nameInput.value = data ? data.name : searchInput.value;
+      },
+    });
+    searchInput.addEventListener('input', () => { nameInput.value = searchInput.value; });
+    searchInput.focus();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
